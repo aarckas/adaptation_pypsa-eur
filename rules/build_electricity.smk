@@ -99,6 +99,37 @@ rule base_network:
     script:
         "../scripts/base_network.py"
 
+rule base_network_baltic:
+    params:
+        countries=config_provider["countries"],
+        snapshots=config_provider["snapshots"],
+        lines=config_provider["lines"],
+        links=config_provider["links"],
+        transformers=config_provider["transformers"],
+        offshore_topology=config["offshore_topology"],
+    input:
+        base_network=resources("networks/base.nc"),
+        eg_buses="data/balticoffshoregridkit/offshore_buses.pkl",
+        eg_lines="data/balticoffshoregridkit/offshore_lines.pkl",
+        eg_links="data/entsoegridkit/links.csv",
+        baltic_shape="data/balticoffshoregridkit/baltic_shape.geojson",
+        parameter_corrections="data/parameter_corrections.yaml",
+
+        country_shapes=RESOURCES + "country_shapes.geojson",
+        offshore_shapes=RESOURCES + "offshore_shapes.geojson",
+        europe_shape=RESOURCES + "europe_shape.geojson",
+
+    output:
+        RESOURCES + "networks/base_baltic.nc",
+    log:
+        LOGS + "base_network_baltic.log",
+    threads: 1
+    resources:
+        mem_mb=1500,
+    conda:
+        "../envs/environment.yaml"
+    script:
+        "../scripts/base_network_baltic.py"
 
 rule build_osm_boundaries:
     input:
