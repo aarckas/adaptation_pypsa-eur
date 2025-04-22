@@ -100,6 +100,40 @@ rule base_network:
         "../scripts/base_network.py"
 
 
+rule base_network_baltic:
+    params:
+        countries=config_provider("countries"),
+        snapshots=config_provider("snapshots"),
+        drop_leap_day=config_provider("enable", "drop_leap_day"),
+        lines=config_provider("lines"),
+        links=config_provider("links"),
+        transformers=config_provider("transformers"),
+        offshore_topology=config_provider("offshore_topology"),
+    input:
+        base_network=resources("networks/base.nc"),
+        eg_buses="data/balticoffshoregridkit/offshore_buses.pkl",
+        eg_lines="data/balticoffshoregridkit/offshore_lines.pkl",
+        eg_links="data/entsoegridkit/links.csv",
+        baltic_shape="data/balticoffshoregridkit/baltic_shape.geojson",
+        parameter_corrections="data/parameter_corrections.yaml",
+
+        country_shapes=resources("country_shapes.geojson"),
+        offshore_shapes=resources("offshore_shapes.geojson"),
+        europe_shape=resources("europe_shape.geojson"),
+
+    output:
+        base_network=resources("networks/base_baltic.nc"),
+    log:
+        logs("base_network_baltic.log"),
+    threads: 1
+    resources:
+        mem_mb=1500,
+    conda:
+        "../envs/environment.yaml"
+    script:
+        "../scripts/base_network_baltic.py"
+
+
 rule build_osm_boundaries:
     input:
         json="data/osm-boundaries/json/{country}_adm1.json",
@@ -392,7 +426,7 @@ rule build_line_rating:
         snapshots=config_provider("snapshots"),
         drop_leap_day=config_provider("enable", "drop_leap_day"),
     input:
-        base_network=resources("networks/base.nc"),
+        base_network=resources("networks/base_baltic.nc"),
         cutout=lambda w: "cutouts/"
         + CDIR
         + config_provider("lines", "dynamic_line_rating", "cutout")(w)
@@ -418,7 +452,7 @@ rule build_transmission_projects:
         line_factor=config_provider("lines", "length_factor"),
         s_max_pu=config_provider("lines", "s_max_pu"),
     input:
-        base_network=resources("networks/base.nc"),
+        base_network=resources("networks/base_baltic.nc"),
         offshore_shapes=resources("offshore_shapes.geojson"),
         europe_shape=resources("europe_shape.geojson"),
         transmission_projects=lambda w: [
@@ -453,7 +487,7 @@ rule add_transmission_projects_and_dlr:
         dlr=config_provider("lines", "dynamic_line_rating"),
         s_max_pu=config_provider("lines", "s_max_pu"),
     input:
-        network=resources("networks/base.nc"),
+        base_network=resources("networks/base_baltic.nc"),
         dlr=lambda w: (
             resources("dlr.nc")
             if config_provider("lines", "dynamic_line_rating", "activate")(w)

@@ -21,7 +21,7 @@ remote:
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#run
 run:
   prefix: "baltic_elec"
-  name: "baltic_test_1.1"
+  name: "baltic_transmission_1.0"
   scenarios:
     enable: false
     file: config/scenarios.yaml
@@ -38,7 +38,7 @@ foresight: overnight
 # Wildcard docs in https://pypsa-eur.readthedocs.io/en/latest/wildcards.html
 scenario:
   clusters:
-  - 128
+  - 18
   opts:
   - ''
   sector_opts:
@@ -49,10 +49,10 @@ scenario:
   # - 2040
   - 2050
 
-offshore_topology: "default-dc"
+#offshore_topology: default
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#countries
-countries: ['DE', 'DK', 'EE', 'FI', 'LT', 'LV', 'PL', 'SE']
+countries: ['DE', 'DK', 'SE', 'PL', 'EE', 'LT', 'LV', 'FI']
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#snapshots
 snapshots:
@@ -66,7 +66,7 @@ enable:
   retrieve_databundle: true
   retrieve_cost_data: true
   build_cutout: false
-  retrieve_cutout: false
+  retrieve_cutout: true
   custom_busmap: false
   drop_leap_day: true
 
@@ -310,8 +310,8 @@ links:
 transmission_projects:
   enable: true
   include:
-    tyndp2020: true
-    nep: true
+    tyndp2020: false
+    nep: false
     manual: true
   skip:
   - upgraded_lines
