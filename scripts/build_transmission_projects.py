@@ -14,6 +14,7 @@ Inputs
 - ``data/transmission_projects/"project_name"/``: Takes the transmission projects from the subfolder of data/transmission_projects. The subfolder name is the project name.
 - ``offshore_shapes.geojson``: Shapefile containing the offshore regions. Used to determine if a new bus should be added for a new line or link.
 - ``europe_shape.geojson``: Shapefile containing the shape of Europe. Used to determine if a project is within the considered countries.
+- country_shapes.geojson (for POC country allocation)
 
 Outputs
 -------
@@ -47,7 +48,7 @@ def add_new_buses(n, new_ports):
     to_add = new_ports[~duplicated]
     added_buses = n.add(
         "Bus",
-        names=to_add.index,
+        name=to_add.index, #fixed error: n.add requires name not names 
         suffix=" bus",
         x=to_add.x,
         y=to_add.y,
@@ -63,8 +64,8 @@ def add_new_buses(n, new_ports):
     new_ports["neighbor"] = new_ports.groupby(["x", "y"])["neighbor"].transform("first")
     return new_ports, new_buses
 
-
-def find_country_for_bus(bus, shapes):
+#added country_shapes to allow for POC country allocation
+def find_country_for_bus(bus, shapes_off, shapes_country):
     """
     Find the country of a bus based on its coordinates and the provided
     shapefile.
@@ -72,7 +73,8 @@ def find_country_for_bus(bus, shapes):
     Shapefile must contain a column "country" with the country names.
     """
     point = Point(bus.x, bus.y)
-    country = shapes.loc[shapes.contains(point), "country"]
+    combined_shapes = pd.concat([shapes_off, shapes_country], ignore_index=True)
+    country = combined_shapes.loc[combined_shapes.contains(point), "country"]    
     return country.values[0]
 
 
@@ -81,6 +83,7 @@ def connect_new_lines(
     n,
     new_buses_df,
     offshore_shapes=None,
+    country_shapes=None, #added country_shapes
     distance_upper_bound=np.inf,
     bus_carrier="AC",
 ):
@@ -90,6 +93,8 @@ def connect_new_lines(
     If closest bus is further away than distance_upper_bound and is
     inside an offshore region, a new bus is created. and the line is
     connected to it.
+    
+    EDIT: Also if the new bus is an POC (onshore connection point) it can be created as a new bus.
     """
     bus_carrier = np.atleast_1d(bus_carrier)
     buses = n.buses.query("carrier in @bus_carrier").copy()
@@ -105,21 +110,31 @@ def connect_new_lines(
         # Series of lines with closest bus in the existing network and whether they match the distance criterion
         lines_port["neighbor"] = buses.iloc[indices].index
         lines_port["match_distance"] = distances < distance_upper_bound
-        # For buses which are not close to any existing bus, only add a new bus if the line is going offshore (e.g. North Sea Wind Power Hub)
-        if not lines_port.match_distance.all() and offshore_shapes.union_all():
+        lines_port["node_type"] = lines.loc[lines_port.index, f"bus{port}"].apply(
+            lambda bus_name: "HUB" if "HUB" in bus_name else ("POC" if "POC" in bus_name else np.nan)
+        )        
+        # For buses which are not close to any existing bus, only add a new bus if the line is going offshore (e.g. North Sea Wind Power Hub) or if it is a POC
+        if not lines_port.match_distance.all() and (
+            offshore_shapes.union_all() or (lines_port["node_type"] == "POC").any()
+        ):    
             potential_new_buses = lines_port[~lines_port.match_distance]
-            is_offshore = potential_new_buses.apply(
-                lambda x: offshore_shapes.union_all().contains(Point(x.x, x.y)), axis=1
-            )
-            new_buses = potential_new_buses[is_offshore]
+            is_offshore_or_poc = potential_new_buses.apply(
+                lambda x: (
+                 offshore_shapes.union_all().contains(Point(x.x, x.y)) if offshore_shapes.union_all() else False
+                ) or (x.node_type == "POC"),
+                axis=1,
+            )            
+            new_buses = potential_new_buses[is_offshore_or_poc]
             if not new_buses.empty:
                 new_port, new_buses = add_new_buses(n, new_buses)
                 new_buses["country"] = new_buses.apply(
-                    lambda bus: find_country_for_bus(bus, offshore_shapes), axis=1
+                    lambda bus: find_country_for_bus(bus, offshore_shapes, country_shapes), axis=1
                 )
                 lines_port.loc[new_port.index, "match_distance"] = True
                 lines_port.loc[new_port.index, "neighbor"] = new_port.neighbor
                 new_buses_df = pd.concat([new_buses_df, new_buses])
+                buses = pd.concat([buses, new_buses])
+                bus_tree = spatial.KDTree(buses[["x", "y"]])
 
         if not lines_port.match_distance.all():
             logging.warning(
@@ -381,6 +396,7 @@ def add_projects(
     new_buses_df,
     europe_shape,
     offshore_shapes,
+    country_shapes,
     path,
     plan,
     status=["confirmed", "under construction"],
@@ -412,7 +428,8 @@ def add_projects(
                 n,
                 new_buses_df,
                 offshore_shapes=offshore_shapes,
-                distance_upper_bound=0.4,
+                country_shapes=country_shapes,
+                distance_upper_bound=0.1,
                 bus_carrier=["AC", "DC"],
             )
             duplicate_links = find_closest_lines(
@@ -463,7 +480,7 @@ if __name__ == "__main__":
     if "snakemake" not in globals():
         from _helpers import mock_snakemake
 
-        snakemake = mock_snakemake("build_transmission_projects")
+        snakemake = mock_snakemake("build_transmission_projects", configfiles="config/baltic/baltic_test.yaml")
     configure_logging(snakemake)
     set_scenario_config(snakemake)
 
@@ -480,6 +497,9 @@ if __name__ == "__main__":
 
     europe_shape = gpd.read_file(snakemake.input.europe_shape).loc[0, "geometry"]
     offshore_shapes = gpd.read_file(snakemake.input.offshore_shapes).rename(
+        {"name": "country"}, axis=1
+    )
+    country_shapes = gpd.read_file(snakemake.input.country_shapes).rename(
         {"name": "country"}, axis=1
     )
 
@@ -502,6 +522,7 @@ if __name__ == "__main__":
                 new_buses_df,
                 europe_shape,
                 offshore_shapes,
+                country_shapes,
                 path=path,
                 plan=project,
                 status=transmission_projects["status"],

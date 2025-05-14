@@ -422,6 +422,7 @@ rule build_transmission_projects:
         base_network=resources("networks/base.nc"),
         offshore_shapes=resources("offshore_shapes.geojson"),
         europe_shape=resources("europe_shape.geojson"),
+        country_shapes=resources("country_shapes.geojson"),
         transmission_projects=lambda w: [
             "data/transmission_projects/" + name
             for name, include in config_provider("transmission_projects", "include")(

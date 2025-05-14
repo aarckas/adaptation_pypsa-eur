@@ -17,7 +17,7 @@ remote:
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#run
 run:
   prefix: "test"
-  name: "test_04_1.0"
+  name: "test_2_countries_adjusted_upper_bound"
   scenarios:
     enable: false
     file: config/scenarios.yaml
@@ -35,7 +35,7 @@ foresight: overnight
 # Wildcard docs in https://pypsa-eur.readthedocs.io/en/latest/wildcards.html
 scenario:
   clusters:
-  - 39
+  - 5
   # - 128
   # - 256
   opts:
@@ -49,7 +49,7 @@ scenario:
   - 2050
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#countries
-countries: ['AL', 'AT', 'BA', 'BE', 'BG', 'CH', 'CZ', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GB', 'GR', 'HR', 'HU', 'IE', 'IT', 'LT', 'LU', 'LV', 'ME', 'MK', 'NL', 'NO', 'PL', 'PT', 'RO', 'RS', 'SE', 'SI', 'SK', 'XK']
+countries: ['DE','SE']
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#snapshots
 snapshots:
@@ -313,8 +313,8 @@ links:
 transmission_projects:
   enable: true
   include:
-    tyndp2020: true
-    nep: true
+    tyndp2020: false
+    nep: false
     manual: true
   skip:
   - upgraded_lines
@@ -897,7 +897,7 @@ clustering:
   focus_weights: false
   simplify_network:
     to_substations: false
-    remove_stubs: true
+    remove_stubs: false
     remove_stubs_across_borders: false
   cluster_network:
     algorithm: kmeans
