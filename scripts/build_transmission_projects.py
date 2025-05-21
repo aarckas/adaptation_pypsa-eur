@@ -38,30 +38,40 @@ from _helpers import configure_logging, set_scenario_config
 from pypsa.descriptors import nominal_attrs
 from scipy import spatial
 from shapely.geometry import LineString, Point
+import geopy.distance
 
 logger = logging.getLogger(__name__)
 
 
 def add_new_buses(n, new_ports):
     # Add new buses for the ports which do not have an existing bus close by. If there are multiple ports at the same location, only one bus is added.
+    #new_ports = new_ports.set_index("node_name")
     duplicated = new_ports.duplicated(subset=["x", "y"], keep="first")
     to_add = new_ports[~duplicated]
+    original_indices = to_add.index.copy()
+    to_add = to_add.set_index("node_name")
     added_buses = n.add(
         "Bus",
-        name=to_add.index, #fixed error: n.add requires name not names 
-        suffix=" bus",
+        name=to_add.index, #fixed error: n.add requires name not names ; changed name to node name from csv
+        suffix="",
         x=to_add.x,
         y=to_add.y,
         v_nom=380,
         under_construction=True,
-        symbol="substation",
-        substation_off=True,
+        symbol="Substation",
+        substation_off=to_add["node_type"] == "HUB",
         substation_lv=False,
-        carrier="AC",
+        carrier="DC",
+        node_type=to_add["node_type"],
     )
     new_buses = n.buses.loc[added_buses].copy().dropna(axis=1, how="all")
-    new_ports.loc[to_add.index, "neighbor"] = added_buses
-    new_ports["neighbor"] = new_ports.groupby(["x", "y"])["neighbor"].transform("first")
+    
+    index_to_name = dict(zip(original_indices, to_add.index))  # from original index to node_name
+    new_ports["neighbor"] = new_ports.index.map(index_to_name)
+    
+    #new_ports.loc[to_add.index, "neighbor"] = added_buses
+    #new_ports["neighbor"] = new_ports.groupby(["x", "y"])["neighbor"].transform("first")
+    
     return new_ports, new_buses
 
 #added country_shapes to allow for POC country allocation
@@ -112,7 +122,9 @@ def connect_new_lines(
         lines_port["match_distance"] = distances < distance_upper_bound
         lines_port["node_type"] = lines.loc[lines_port.index, f"bus{port}"].apply(
             lambda bus_name: "HUB" if "HUB" in bus_name else ("POC" if "POC" in bus_name else np.nan)
-        )        
+        )
+        lines_port["node_name"] = lines.loc[lines_port.index, f"bus{port}"]
+        #lines_port = lines_port.set_index("node_name")        
         # For buses which are not close to any existing bus, only add a new bus if the line is going offshore (e.g. North Sea Wind Power Hub) or if it is a POC
         if not lines_port.match_distance.all() and (
             offshore_shapes.union_all() or (lines_port["node_type"] == "POC").any()
@@ -145,7 +157,7 @@ def connect_new_lines(
             lines.drop(lines_port[~lines_port.match_distance].index, inplace=True)
             lines_port = lines_port[lines_port.match_distance]
 
-        lines.loc[lines_port.index, f"bus{port}"] = lines_port["neighbor"]
+        lines.loc[lines_port.index, f"bus{port}"] = lines_port["node_name"]
 
     lines = lines.assign(under_construction=True)
 
@@ -429,7 +441,7 @@ def add_projects(
                 new_buses_df,
                 offshore_shapes=offshore_shapes,
                 country_shapes=country_shapes,
-                distance_upper_bound=0.1,
+                distance_upper_bound=0.00001,
                 bus_carrier=["AC", "DC"],
             )
             duplicate_links = find_closest_lines(
@@ -474,6 +486,93 @@ def fill_length_from_geometry(line, line_factor=1.2):
     length = gpd.GeoSeries(line["geometry"], crs=4326).to_crs(3035).length.values[0]
     length = length / 1000 * line_factor
     return round(length, 1)
+
+
+def connect_POCs(n, new_buses_df, default_p_nom=4000):
+    """
+    Connects all 'POC' buses to the nearest onshore AC bus via high-capacity DC converter links.
+    """
+    # Filter POC buses
+    poc_buses = new_buses_df.query("node_type == 'POC'")
+
+    if poc_buses.empty:
+        return []  # No POC buses
+
+    # Select all AC buses in the existing network
+    ac_buses = n.buses.query("carrier == 'AC' and onshore_bus == True")
+
+    # Build KDTree of AC buses
+    ac_coords = ac_buses[["x", "y"]]
+    tree = spatial.KDTree(ac_coords)
+    
+    new_links = []
+    POC_Link_Counter = 1
+    
+    for bus in poc_buses.index:
+        poc_coord = poc_buses.loc[bus, ['x', 'y']].values
+        distance_deg, index = tree.query([poc_coord])
+        
+        nearest_bus = ac_buses.index[index[0]]
+        pypsa_coord = ac_buses.loc[nearest_bus, ['x', 'y']].values
+        
+        distance_km = geopy.distance.geodesic(poc_coord, pypsa_coord).km
+        
+        n.add("Link",
+              name=['POC Link ' + str(POC_Link_Counter)],
+              bus0=nearest_bus,  # AC bud PyPSA
+              bus1=bus,  # DC bus offshore
+              carrier='AC',
+              length=0,
+              p_nom=4000,
+              p_max_pu=0.9,
+              p_min_pu=-0.9,
+              capital_cost=0,
+              efficiency=1.0,
+              p_nom_extendable=True,
+              marginal_cost=0,
+              min_up_time=0,
+              min_down_time=0,
+              up_time_before=1,
+              down_time_before=0,
+              p_nom_opt=4000,
+              type='',
+              lifetime=float('inf'),
+              p_nom_max=float('inf'),
+              p_set=0.0,
+              marginal_cost_quadratic=0.0,
+              stand_by_cost=0.0,
+              terrain_factor=1.0,
+              committable=False,
+              start_up_cost=0.0,
+              shut_down_cost=0.0,
+              ramp_limit_up=float('nan'),
+              ramp_limit_down=float('nan'),
+              ramp_limit_start_up=1.0,
+              ramp_limit_shut_down=1.0,
+              under_construction=False,
+            )
+        
+        link_name = f"POC Link {POC_Link_Counter}"
+        link_data = dict(
+            name=link_name,
+            bus0=nearest_bus,
+            bus1=bus,
+            carrier="AC",
+            length=distance_km,
+            p_nom=default_p_nom,
+            p_nom_extendable=True,
+            under_construction=False)
+        
+        new_links.append(link_data)
+        #new_links = new_links.set_index("name")
+        
+        POC_Link_Counter += 1
+
+        print(f"The nearest neighbor to {poc_coord} is {pypsa_coord} with a distance of {distance_km:.2f} km")
+    
+    new_converter_links = pd.DataFrame(new_links).set_index("name")    
+
+    return new_converter_links
 
 
 if __name__ == "__main__":
@@ -566,6 +665,11 @@ if __name__ == "__main__":
             new_links_df.loc[not_upgraded, "p_nom"] = new_links_df["p_nom"].fillna(0)
         elif transmission_projects["new_link_capacity"] == "zero":
             new_links_df.loc[not_upgraded, "p_nom"] = 0
+    if not new_buses_df.empty:
+        # Add POC-to-Onshore-Grid-Link (Converter)
+        new_converter_links = connect_POCs(n,new_buses_df)
+        new_links_df = pd.concat([new_links_df, new_converter_links])        
+            
     # export csv files for new buses, lines, links and adjusted lines and links
     new_lines_df.to_csv(snakemake.output.new_lines)
     new_links_df.to_csv(snakemake.output.new_links)
