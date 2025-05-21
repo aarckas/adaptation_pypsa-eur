@@ -17,7 +17,7 @@ remote:
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#run
 run:
   prefix: "test"
-  name: "test_2_countries_adjusted_upper_bound"
+  name: "test_network_DE_SE_v1"
   scenarios:
     enable: false
     file: config/scenarios.yaml
@@ -35,7 +35,7 @@ foresight: overnight
 # Wildcard docs in https://pypsa-eur.readthedocs.io/en/latest/wildcards.html
 scenario:
   clusters:
-  - 5
+  - 12
   # - 128
   # - 256
   opts:
@@ -899,6 +899,7 @@ clustering:
     to_substations: false
     remove_stubs: false
     remove_stubs_across_borders: false
+    simplify_links: false #added to turn of simplification/clustering of DC subnetworks
   cluster_network:
     algorithm: kmeans
     hac_features:
