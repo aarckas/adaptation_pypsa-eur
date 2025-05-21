@@ -418,7 +418,7 @@ if __name__ == "__main__":
     if "snakemake" not in globals():
         from _helpers import mock_snakemake
 
-        snakemake = mock_snakemake("simplify_network")
+        snakemake = mock_snakemake("simplify_network", configfiles="config/baltic/baltic_test.yaml")
     configure_logging(snakemake)
     set_scenario_config(snakemake)
 
@@ -435,8 +435,9 @@ if __name__ == "__main__":
     n, converter_map = remove_converters(n)
     busmaps.append(converter_map)
 
-    n, simplify_links_map = simplify_links(n, params.p_max_pu)
-    busmaps.append(simplify_links_map)
+    if params.simplify_network["simplify_links"]:
+        n, simplify_links_map = simplify_links(n, params.p_max_pu)
+        busmaps.append(simplify_links_map)
 
     if params.simplify_network["remove_stubs"]:
         if params.mode == "administrative":
