@@ -274,6 +274,13 @@ def clustering_for_n_clusters(
     bus_strategies = aggregation_strategies.get("buses", dict())
     bus_strategies.setdefault("substation_lv", lambda x: bool(x.sum()))
     bus_strategies.setdefault("substation_off", lambda x: bool(x.sum()))
+    
+     # Prevent clustering for POC and HUB
+    node_types = n.buses.get("node_type", pd.Series(index=n.buses.index))
+    non_clustered_buses = node_types[node_types.isin(["POC", "HUB"])].index
+    
+     # Override their cluster mapping to their own name
+    busmap.loc[non_clustered_buses] = non_clustered_buses
 
     clustering = get_clustering_from_busmap(
         n,
@@ -459,7 +466,7 @@ if __name__ == "__main__":
     if "snakemake" not in globals():
         from _helpers import mock_snakemake
 
-        snakemake = mock_snakemake("cluster_network", clusters=60)
+        snakemake = mock_snakemake("cluster_network", clusters=6, configfiles="config/baltic/baltic_test.yaml")
     configure_logging(snakemake)
     set_scenario_config(snakemake)
 
