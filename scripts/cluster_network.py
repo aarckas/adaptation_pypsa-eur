@@ -289,7 +289,11 @@ def clustering_for_n_clusters(
         line_strategies=line_strategies,
         custom_line_groupers=["build_year"],
     )
-
+    #Adjust length back to generated link length from QGIS search graph
+    custom_links = n.links[n.links.bus0.str.contains("HUB") | n.links.bus1.str.contains("HUB")].index
+    custom_length = n.links.length
+    clustering.n.links.loc[custom_links, "length"] = custom_length.loc[custom_links]
+    
     return clustering
 
 
@@ -466,7 +470,7 @@ if __name__ == "__main__":
     if "snakemake" not in globals():
         from _helpers import mock_snakemake
 
-        snakemake = mock_snakemake("cluster_network", clusters=6, configfiles="config/baltic/baltic_test.yaml")
+        snakemake = mock_snakemake("cluster_network", clusters=7, configfiles="config/baltic/baltic_test.yaml")
     configure_logging(snakemake)
     set_scenario_config(snakemake)
 
@@ -489,7 +493,7 @@ if __name__ == "__main__":
     elif mode == "administrative":
         n_clusters = np.nan
     else:
-        n_clusters = int(snakemake.wildcards.clusters)
+        n_clusters = int(snakemake.wildcards.clusters) + len(n.buses.query("node_type == 'POC' or node_type == 'HUB'")) 
 
     if n_clusters == len(n.buses):
         # Fast-path if no clustering is necessary
