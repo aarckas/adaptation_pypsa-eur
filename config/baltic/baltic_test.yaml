@@ -17,7 +17,7 @@ remote:
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#run
 run:
   prefix: "test"
-  name: "test_network_DE_SE_v1"
+  name: "test_network_DE_SE_offshore_regions_v2"
   scenarios:
     enable: false
     file: config/scenarios.yaml
@@ -35,7 +35,7 @@ foresight: overnight
 # Wildcard docs in https://pypsa-eur.readthedocs.io/en/latest/wildcards.html
 scenario:
   clusters:
-  - 12
+  - 7
   # - 128
   # - 256
   opts:
@@ -65,6 +65,7 @@ enable:
   build_cutout: false
   retrieve_cutout: true
   drop_leap_day: true
+  update_offshore_regions: true
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#co2-budget
 co2_budget:
@@ -913,7 +914,7 @@ clustering:
       ramp_limit_up: max
       ramp_limit_down: max
   temporal:
-    resolution_elec: "6H"
+    resolution_elec: "24H"
     resolution_sector: false
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#adjustments
