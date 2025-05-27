@@ -487,6 +487,32 @@ rule add_transmission_projects_and_dlr:
         "../scripts/add_transmission_projects_and_dlr.py"
 
 
+rule update_offshore_regions: #new rule added
+    params:
+        update_offshore_regions=config_provider("enable", "update_offshore_regions"),
+        countries=config_provider("countries"),
+    input:
+        network=resources("networks/base_extended.nc"),
+        offshore_shapes=resources("offshore_shapes.geojson"),
+        regions_onshore=resources("regions_onshore.geojson"),
+        regions_offshore=resources("regions_offshore.geojson"),
+        admin_shapes=resources("admin_shapes.geojson"),
+    output:
+        regions_offshore_updated=resources("regions_offshore_updated.geojson"), 
+    log:
+        logs("update_offshore_regions.log"),
+    benchmark:
+        benchmarks("update_offshore_regions")
+    threads: 1
+    resources:
+        mem_mb=4000,
+    conda:
+        "../envs/environment.yaml"
+    script:
+        "../scripts/update_offshore_regions.py"
+
+
+
 def input_profile_tech(w):
     return {
         f"profile_{tech}": resources(f"profile_{tech}.nc")
@@ -563,7 +589,7 @@ rule simplify_network:
     input:
         network=resources("networks/base_extended.nc"),
         regions_onshore=resources("regions_onshore.geojson"),
-        regions_offshore=resources("regions_offshore.geojson"),
+        regions_offshore=resources("regions_offshore_updated.geojson"), #adjusted, TODO: make it a if clause in case offshore_regions is not updated
         admin_shapes=resources("admin_shapes.geojson"),
     output:
         network=resources("networks/base_s.nc"),
