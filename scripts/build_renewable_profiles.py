@@ -109,7 +109,7 @@ if __name__ == "__main__":
         from _helpers import mock_snakemake
 
         snakemake = mock_snakemake(
-            "build_renewable_profiles", clusters=38, technology="offwind-ac"
+            "build_renewable_profiles", configfiles="config/baltic/baltic_test.yaml", clusters=7, technology="offwind-dc"
         )
     configure_logging(snakemake)
     set_scenario_config(snakemake)
@@ -151,7 +151,7 @@ if __name__ == "__main__":
     if snakemake.wildcards.technology.startswith("offwind"):
         # for offshore regions, the shortest distance to the shoreline is used
         offshore_regions = availability.coords["bus"].values
-        regions = regions.loc[offshore_regions]
+        regions = regions[regions.index.isin(offshore_regions)]
         regions = regions.map(lambda g: _simplify_polys(g, minarea=1)).set_crs(
             regions.crs
         )
@@ -159,7 +159,9 @@ if __name__ == "__main__":
         # for onshore regions, the representative point of the region is used
         regions = regions.representative_point()
     regions = regions.geometry.to_crs(3035)
-    buses = regions.index
+    res_regions = gpd.read_file(snakemake.input.resource_regions)
+    res_regions = res_regions.set_index("name").rename_axis("bus")
+    buses = res_regions.index
 
     area = cutout.grid.to_crs(3035).area / 1e6
     area = xr.DataArray(
@@ -290,10 +292,27 @@ if __name__ == "__main__":
         nz_b = row != 0
         row = row[nz_b]
         co = coords[nz_b]
+
+        if bus not in regions.index:
+        # If no region shape is available (e.g. for HUBs), set distance to NaN or 0
+            average_distance.append(np.nan)  # or 0.0 if preferred
+            continue
+
+        distances = co.distance(regions[bus]).div(1e3)  # km
+        average_distance.append((distances * (row / row.sum())).sum())
+        
+    average_distance = xr.DataArray(average_distance, [bus_bins]).unstack("bus_bin")    
+        
+    """for bus, bin in bus_bins:
+        row = layoutmatrix.sel(bus=bus, bin=bin).data
+        nz_b = row != 0
+        row = row[nz_b]
+        co = coords[nz_b]
         distances = co.distance(regions[bus]).div(1e3)  # km
         average_distance.append((distances * (row / row.sum())).sum())
 
-    average_distance = xr.DataArray(average_distance, [bus_bins]).unstack("bus_bin")
+    average_distance = xr.DataArray(average_distance, [bus_bins]).unstack("bus_bin") """       
+
 
     ds = xr.merge(
         [
