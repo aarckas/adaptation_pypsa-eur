@@ -72,7 +72,7 @@ if __name__ == "__main__":
         from _helpers import mock_snakemake
 
         snakemake = mock_snakemake(
-            "build_renewable_profiles", clusters=100, technology="onwind"
+            "build_renewable_profiles", clusters=12, technology="offwind-dc", configfiles="config/baltic/baltic_test.yaml"
         )
     configure_logging(snakemake)
     set_scenario_config(snakemake)
@@ -84,7 +84,7 @@ if __name__ == "__main__":
     params = snakemake.params.renewable[technology]
 
     cutout = load_cutout(snakemake.input.cutout)
-    regions = gpd.read_file(snakemake.input.regions)
+    regions = gpd.read_file(snakemake.input.regions)   #resource_regions) - changed to resource_region here so mock_snakemake works (change back to "regions" if necessary)
     assert not regions.empty, (
         f"List of regions in {snakemake.input.regions} is empty, please "
         "disable the corresponding renewable technology"
