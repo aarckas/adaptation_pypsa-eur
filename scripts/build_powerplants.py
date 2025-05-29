@@ -146,7 +146,7 @@ if __name__ == "__main__":
     if "snakemake" not in globals():
         from _helpers import mock_snakemake
 
-        snakemake = mock_snakemake("build_powerplants")
+        snakemake = mock_snakemake("build_powerplants", configfiles="config/baltic/baltic_test.yaml", clusters=7)
     configure_logging(snakemake)
     set_scenario_config(snakemake)
 
@@ -192,7 +192,8 @@ if __name__ == "__main__":
     )
 
     ppl = ppl.dropna(subset=["lat", "lon"])
-    ppl = map_country_bus(ppl, n.buses)
+    buses_no_POCs_HUBs = n.buses[~n.buses.node_type.isin(["POC", "HUB"])] #added line so that powerplant capacity is not allocated to POCs (or HUBs)
+    ppl = map_country_bus(ppl, buses_no_POCs_HUBs)
 
     bus_null_b = ppl["bus"].isnull()
     if bus_null_b.any():
