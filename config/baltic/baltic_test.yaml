@@ -16,8 +16,8 @@ remote:
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#run
 run:
-  prefix: "test"
-  name: "test_network_DE_SE_offshore_regions_v2"
+  prefix: "v1"
+  name: "baltic_DE_SE_PL_capital_cost_test_3"
   scenarios:
     enable: false
     file: config/scenarios.yaml
@@ -35,7 +35,7 @@ foresight: overnight
 # Wildcard docs in https://pypsa-eur.readthedocs.io/en/latest/wildcards.html
 scenario:
   clusters:
-  - 7
+  - 24
   # - 128
   # - 256
   opts:
@@ -49,7 +49,7 @@ scenario:
   - 2050
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#countries
-countries: ['DE','SE']
+countries: ['DE','SE','PL']
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#snapshots
 snapshots:
@@ -99,7 +99,7 @@ electricity:
     H2: 168
 
   extendable_carriers:
-    Generator: [solar, solar-hsat, onwind, offwind-ac, offwind-dc, offwind-float, OCGT, CCGT]
+    Generator: [solar, solar-hsat, onwind, offwind-ac, offwind-dc, OCGT, CCGT]
     StorageUnit: [] # battery, H2
     Store: [battery, H2]
     Link: [] # H2 pipeline
@@ -109,7 +109,7 @@ electricity:
   everywhere_powerplants: []
 
   conventional_carriers: [nuclear, oil, OCGT, CCGT, coal, lignite, geothermal, biomass]
-  renewable_carriers: [solar, solar-hsat, onwind, offwind-ac, offwind-dc, offwind-float, hydro]
+  renewable_carriers: [solar, solar-hsat, onwind, offwind-ac, offwind-dc, hydro]
 
   estimate_renewable_capacities:
     enable: true
