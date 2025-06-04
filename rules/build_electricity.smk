@@ -413,13 +413,40 @@ rule build_line_rating:
         "../scripts/build_line_rating.py"
 
 
+rule preprocess_transmission_projects:
+    params:
+        transmission_projects=config_provider("transmission_projects"),
+        countries=config_provider("countries"),
+    input:
+        base_network=resources("networks/base.nc"),
+        search_graph="data/QGIS_Export/search_graph_table.csv",
+        bus_data="data/QGIS_Export/bus_data.csv",
+    output:
+        #new_lines=directory("data/transmission_projects/manual/new_lines.csv"),
+        new_links="data/transmission_projects/manual/new_links.csv",
+        bus_data=resources("QGIS_bus_data.csv"),
+        search_graph_data=resources("QGIS_search_graph_data.csv"),
+        network=resources("networks/base_pre.nc"),
+    log:
+        logs("preprocess_transmission_projects.log"),
+    benchmark:
+        benchmarks("preprocess_transmission_projects")
+    resources:
+        mem_mb=4000,
+    threads: 1
+    conda:
+        "../envs/environment.yaml"
+    script:
+        "../scripts/preprocess_transmission_projects.py"
+
+
 rule build_transmission_projects:
     params:
         transmission_projects=config_provider("transmission_projects"),
         line_factor=config_provider("lines", "length_factor"),
         s_max_pu=config_provider("lines", "s_max_pu"),
     input:
-        base_network=resources("networks/base.nc"),
+        base_network=resources("networks/base_pre.nc"),
         offshore_shapes=resources("offshore_shapes.geojson"),
         europe_shape=resources("europe_shape.geojson"),
         country_shapes=resources("country_shapes.geojson"),
@@ -455,7 +482,7 @@ rule add_transmission_projects_and_dlr:
         dlr=config_provider("lines", "dynamic_line_rating"),
         s_max_pu=config_provider("lines", "s_max_pu"),
     input:
-        network=resources("networks/base.nc"),
+        network=resources("networks/base_pre.nc"),
         dlr=lambda w: (
             resources("dlr.nc")
             if config_provider("lines", "dynamic_line_rating", "activate")(w)
@@ -728,6 +755,7 @@ rule add_electricity:
         ),
         load=resources("electricity_demand_base_s.nc"),
         busmap=resources("busmap_base_s_{clusters}.csv"),
+        bus_data=resources("QGIS_bus_data.csv"),
     output:
         resources("networks/base_s_{clusters}_elec.nc"),
     log:
