@@ -481,10 +481,18 @@ def set_transmission_costs(
     # may be missing. Therefore we have to return here.
     if n.links.loc[dc_b].empty:
         return
+    
+    #Adjusted so that DC-links from the base network apply link_length_factor but added links dont.
+    # Detect HUB links
+    is_hub_link = n.links.loc[dc_b].index.str.contains("HUB")
+
+    # Define link-specific length factors
+    length_factors = pd.Series(link_length_factor, index=n.links.loc[dc_b].index)
+    length_factors[is_hub_link] = 1.0  # Don't scale for HUB links
 
     costs = (
         n.links.loc[dc_b, "length"]
-        * link_length_factor
+        * length_factors
         * (
             (1.0 - n.links.loc[dc_b, "underwater_fraction"])
             * costs.at["HVDC overhead", "capital_cost"]
@@ -554,10 +562,18 @@ def attach_wind_and_solar(
                 underground_cost = costs.at[
                     car + "-connection-underground", "capital_cost"
                 ]
-                connection_cost = line_length_factor * (
-                    distance * submarine_cost + landfall_length * underground_cost
-                )
+                # Set connection_cost = 0 for HUB links (based on name match)
+                is_hub_link = distance.index.str.contains("HUB")
 
+                # Zero connection cost for HUB links
+                connection_cost = pd.Series(0.0, index=distance.index)
+
+                # Apply real cost only for non-HUB links
+                connection_cost.loc[~is_hub_link] = line_length_factor * (
+                    distance.loc[~is_hub_link] * submarine_cost
+                    + landfall_length * underground_cost
+                )
+                
                 capital_cost = (
                     costs.at["offwind", "capital_cost"]
                     + costs.at[car + "-station", "capital_cost"]
@@ -1132,7 +1148,7 @@ if __name__ == "__main__":
     if "snakemake" not in globals():
         from _helpers import mock_snakemake
 
-        snakemake = mock_snakemake("add_electricity", clusters=100)
+        snakemake = mock_snakemake("add_electricity", clusters=24, configfiles="config/baltic/baltic_test.yaml")
     configure_logging(snakemake)  # pylint: disable=E0606
     set_scenario_config(snakemake)
 
@@ -1221,7 +1237,42 @@ if __name__ == "__main__":
         params.line_length_factor,
         landfall_lengths,
     )
+    
+    # Load bus_data.csv
+    bus_data = pd.read_csv(snakemake.input.bus_data) 
 
+    # Filter buses with node_type "HUB"
+    hub_buses = bus_data[bus_data["node_fct"] == "HUB"]
+
+    # Assign cluster_GW values to p_nom_max and p_nom for corresponding generators
+    hub_buses_in_generators = [x for x in n.generators.index if 'HUB' in x]
+    df = n.generators.loc[hub_buses_in_generators]
+    vc = df['bus'].value_counts()
+    bus_AC_and_DC = vc[vc == 2].index  # Identify buses with both AC and DC generators
+
+    for _, row in hub_buses.iterrows():
+        bus_name = row["node_id"]  
+        cluster_gw = row["cluster_GW"] * 1e3  # Convert GW to MW
+
+        # Split capacity if both AC and DC generators exist for the bus
+        if bus_name in bus_AC_and_DC:
+            cluster_gw /= 2
+        
+            # Loop through bus_bins to update generators for each bin
+        bus_bins = [x for x in n.generators.index if x.startswith(f"{bus_name} ") and ("offwind-dc" in x or "offwind-ac" in x)]
+        for generator in bus_bins:
+            if "offwind-dc" in generator:
+                n.generators.loc[generator, "p_nom_max"] = cluster_gw
+            elif "offwind-ac" in generator:
+                n.generators.loc[generator, "p_nom_max"] = cluster_gw    
+
+        # Update p_nom_max and p_nom for both offwind-dc and offwind-ac generators
+        #n.generators.loc[f"{bus_name} offwind-dc", "p_nom_max"] = cluster_gw
+        #n.generators.loc[f"{bus_name} offwind-dc", "p_nom"] = cluster_gw
+        #n.generators.loc[f"{bus_name} offwind-ac", "p_nom_max"] = cluster_gw
+        #n.generators.loc[f"{bus_name} offwind-ac", "p_nom"] = cluster_gw
+    
+    
     if "hydro" in renewable_carriers:
         p = params.renewable["hydro"]
         carriers = p.pop("carriers", [])
