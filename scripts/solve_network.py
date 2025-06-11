@@ -1357,12 +1357,12 @@ if __name__ == "__main__":
         from _helpers import mock_snakemake
 
         snakemake = mock_snakemake(
-            "solve_sector_network",
-            opts="",
-            clusters="5",
-            configfiles="config/test/config.overnight.yaml",
+            "solve_network",
+            opts="CCL",
+            clusters="80",
+            configfiles="config/baltic/baltic_test.yaml",
             sector_opts="",
-            planning_horizons="2030",
+            planning_horizons="2050",
         )
     configure_logging(snakemake)
     set_scenario_config(snakemake)
@@ -1373,7 +1373,7 @@ if __name__ == "__main__":
     np.random.seed(solve_opts.get("seed", 123))
 
     n = pypsa.Network(snakemake.input.network)
-    planning_horizons = snakemake.wildcards.get("planning_horizons", None)
+    planning_horizons = snakemake.wildcards.get("planning_horizons", '2050') #adjusted None to 2050
 
     prepare_network(
         n,
