@@ -366,7 +366,7 @@ def remove_projects_outside_countries(lines, europe_shape):
     """
     europe_shape_prepped = shapely.prepared.prep(europe_shape)
     is_within_covered_countries = lines["geometry"].apply(
-        lambda x: europe_shape_prepped.contains(x)
+        lambda x: europe_shape_prepped.intersects(x)
     )
 
     if not is_within_covered_countries.all():
