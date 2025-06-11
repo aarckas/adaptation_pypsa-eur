@@ -109,7 +109,7 @@ if __name__ == "__main__":
         from _helpers import mock_snakemake
 
         snakemake = mock_snakemake(
-            "build_renewable_profiles", configfiles="config/baltic/baltic_test.yaml", clusters=7, technology="offwind-dc"
+            "build_renewable_profiles", configfiles="config/baltic/baltic_test.yaml", clusters=80, technology="offwind-dc"
         )
     configure_logging(snakemake)
     set_scenario_config(snakemake)
