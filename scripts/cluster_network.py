@@ -161,9 +161,9 @@ def distribute_n_clusters_to_countries(
 
     N = n.buses.groupby(["country", "sub_network"]).size()[L.index]
 
-    assert n_clusters >= len(N) and n_clusters <= N.sum(), (
-        f"Number of clusters must be {len(N)} <= n_clusters <= {N.sum()} for this selection of countries."
-    )
+    #assert n_clusters >= len(N) and n_clusters <= N.sum(), (
+        #f"Number of clusters must be {len(N)} <= n_clusters <= {N.sum()} for this selection of countries."
+    #)
 
     if isinstance(focus_weights, dict):
         total_focus = sum(list(focus_weights.values()))
@@ -187,8 +187,13 @@ def distribute_n_clusters_to_countries(
     )
 
     m = linopy.Model()
+    
+    #add dynamic constraint, so that added HUBs and POCs dont get own cluster at this point, but low-load buses from base subnetworks still get one
+    #added this change bc otherwise it would allocate all nodes on DE for some reason 
+    lower_bounds = (L > 0).astype(int)
+    
     clusters = m.add_variables(
-        lower=1, upper=N, coords=[L.index], name="n", integer=True
+        lower=lower_bounds, upper=N, coords=[L.index], name="n", integer=True
     )
     m.add_constraints(clusters.sum() == n_clusters, name="tot")
     # leave out constant in objective (L * n_clusters) ** 2
@@ -470,7 +475,7 @@ if __name__ == "__main__":
     if "snakemake" not in globals():
         from _helpers import mock_snakemake
 
-        snakemake = mock_snakemake("cluster_network", clusters=7, configfiles="config/baltic/baltic_test.yaml")
+        snakemake = mock_snakemake("cluster_network", clusters=60, configfiles="config/baltic/baltic_test.yaml")
     configure_logging(snakemake)
     set_scenario_config(snakemake)
 
@@ -493,7 +498,7 @@ if __name__ == "__main__":
     elif mode == "administrative":
         n_clusters = np.nan
     else:
-        n_clusters = int(snakemake.wildcards.clusters) + len(n.buses.query("node_type == 'POC' or node_type == 'HUB'")) 
+        n_clusters = int(snakemake.wildcards.clusters) #+ len(n.buses.query("node_type == 'POC' or node_type == 'HUB'")) 
 
     if n_clusters == len(n.buses):
         # Fast-path if no clustering is necessary
