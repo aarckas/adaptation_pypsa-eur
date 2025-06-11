@@ -16,8 +16,8 @@ remote:
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#run
 run:
-  prefix: "v1"
-  name: "baltic_DE_SE_PL_capital_cost_test_3"
+  prefix: "v3"
+  name: "baltic_DE_DK_SE_PL_Load1.9"
   scenarios:
     enable: false
     file: config/scenarios.yaml
@@ -35,11 +35,16 @@ foresight: overnight
 # Wildcard docs in https://pypsa-eur.readthedocs.io/en/latest/wildcards.html
 scenario:
   clusters:
-  - 24
+  - 80
   # - 128
   # - 256
   opts:
-  - ''
+  #- 'onwind+p0.8'
+  #- 'onwind+p0.6'
+  #- 'onwind+p0.3'
+  #- 'CCL'
+  - Co2L0
+  - Co2L0-CCL
   sector_opts:
   - ''
   planning_horizons:
@@ -49,7 +54,7 @@ scenario:
   - 2050
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#countries
-countries: ['DE','SE','PL']
+countries: ['DE','SE','PL','DK']
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#snapshots
 snapshots:
@@ -339,7 +344,7 @@ load:
   interpolate_limit: 3
   time_shift_for_large_gaps: 1w
   manual_adjustments: true # false
-  scaling_factor: 1.0
+  scaling_factor: 1.9
   fixed_year: false # false or year (e.g. 2013)
   supplement_synthetic: true
   distribution_key:
@@ -965,11 +970,11 @@ solving:
 
   agg_p_nom_limits:
     agg_offwind: false
-    include_existing: false
+    include_existing: true
     file: data/agg_p_nom_minmax.csv
 
   constraints:
-    CCL: false
+    CCL: true
     EQ: false
     BAU: false
     SAFE: false
