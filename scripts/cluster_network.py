@@ -294,10 +294,6 @@ def clustering_for_n_clusters(
         line_strategies=line_strategies,
         custom_line_groupers=["build_year"],
     )
-    #Adjust length back to generated link length from QGIS search graph
-    custom_links = n.links[n.links.bus0.str.contains("HUB") | n.links.bus1.str.contains("HUB")].index
-    custom_length = n.links.length
-    clustering.n.links.loc[custom_links, "length"] = custom_length.loc[custom_links]
     
     return clustering
 
@@ -558,6 +554,15 @@ if __name__ == "__main__":
             busmap,
             aggregation_strategies=params.aggregation_strategies,
         )
+        
+        #Restore link lengths from QGIS input that have been altered during the clustering workflow.
+        if params.cluster_network["keep_refined_length"]:
+            logger.info("Restoring refined link/line lengths for custom links.")
+            custom_links = n.links[n.links.bus0.str.contains("HUB") | n.links.bus1.str.contains("HUB")].index
+            custom_length = n.links.length
+            clustering.n.links.loc[custom_links, "length"] = custom_length.loc[custom_links]
+        else:
+            logger.info("Using link/line lengths estimated by PyPSA-Eur workflow.")    
 
     nc = clustering.n
 
