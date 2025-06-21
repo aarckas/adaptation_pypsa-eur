@@ -158,7 +158,7 @@ def set_transmission_limit(n, kind, factor, costs, Nyears=1):
         + n.links.loc[links_dc_b, "p_nom"] @ n.links.loc[links_dc_b, col]
     )
 
-    set_transmission_costs(n, costs)
+    #set_transmission_costs(n, costs)
 
     if factor == "opt" or float(factor) > 1.0:
         n.lines["s_nom_min"] = lines_s_nom
