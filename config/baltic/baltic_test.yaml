@@ -16,8 +16,8 @@ remote:
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#run
 run:
-  prefix: "v5"
-  name: "baltic4_NoCaps_1095seg_refined_UPDATED"
+  prefix: "v6"
+  name: "baltic4_refined"
   scenarios:
     enable: false
     file: config/scenarios.yaml
@@ -35,8 +35,8 @@ foresight: overnight
 # Wildcard docs in https://pypsa-eur.readthedocs.io/en/latest/wildcards.html
 scenario:
   clusters:
-  - 80
-  # - 128
+  #- 80
+   - 100
   # - 256
   opts:
   #- 'onwind+p0.8'
@@ -44,7 +44,7 @@ scenario:
   #- 'onwind+p0.3'
   #- 'CCL'
   - Co2L0
-  #- Co2L0-CCL
+  #- Co2L0-solar+c0.25
   sector_opts:
   - ''
   planning_horizons:
@@ -311,7 +311,7 @@ lines:
 links:
   p_max_pu: 1.0
   p_nom_max: .inf
-  max_extension: 30000 #MW
+  max_extension: 20000 #MW
   length_factor: 1.25
   under_construction: 'keep' # 'zero': set capacity to zero, 'remove': remove, 'keep': with full capacity for lines in grid extract
 
