@@ -292,8 +292,8 @@ if __name__ == "__main__":
         snakemake = mock_snakemake(
             "prepare_network",
             configfiles="config/baltic/baltic_test.yaml",
-            clusters="80",
-            opts="onwind+p0.3",
+            clusters="100",
+            opts="Co2L0",
         )
     configure_logging(snakemake)  # pylint: disable=E0606
     set_scenario_config(snakemake)
