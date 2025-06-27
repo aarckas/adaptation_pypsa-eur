@@ -1274,12 +1274,12 @@ if __name__ == "__main__":
         dist = row["distance_to_shore"]
         
         # Define AC/DC share based on distance
-        if dist <= 25:
+        if dist <= 10:
             ac_share = 1.0
-        elif dist >= 75:
+        elif dist >= 70:
             ac_share = 0.0
         else:
-            ac_share = (75 - dist) / (75 - 25)  # linear interpolation
+            ac_share = (70 - dist) / (70 - 10)  # linear interpolation
 
         dc_share = 1 - ac_share
         
