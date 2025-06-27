@@ -55,6 +55,9 @@ from typing import Any
 import geopandas as gpd
 import numpy as np
 import pandas as pd
+import geopandas as gpd
+from shapely.geometry import Point
+from shapely.ops import nearest_points
 import powerplantmatching as pm
 import pypsa
 import xarray as xr
@@ -1242,29 +1245,83 @@ if __name__ == "__main__":
     bus_data = pd.read_csv(snakemake.input.bus_data) 
 
     # Filter buses with node_type "HUB"
-    hub_buses = bus_data[bus_data["node_fct"] == "HUB"]
+    hub_buses = bus_data[bus_data["node_fct"] == "HUB"].copy()
+
+    hubs_gdf = gpd.GeoDataFrame(hub_buses, geometry=gpd.points_from_xy(hub_buses.x_transformed, hub_buses.y_transformed), crs="EPSG:4326")
+    # 2. Load land polygon (e.g., from PyPSA-Eur)
+    land = gpd.read_file(snakemake.input.regions)  # or land.geojson
+    land = land.to_crs("EPSG:3035")  # Project to meters
+    
+    hubs_gdf = hubs_gdf.to_crs("EPSG:3035")
+    
+    # 3. Merge land into one shape
+    land_union = land.unary_union  # shapely.geometry.MultiPolygon or Polygon
+
+    # 4. Compute distance from each HUB to the nearest shore (in km)
+    hubs_gdf["distance_to_shore"] = hubs_gdf.geometry.apply(
+        lambda point: land_union.distance(point) / 1000  # result in km
+    )   
 
     # Assign cluster_GW values to p_nom_max and p_nom for corresponding generators
     hub_buses_in_generators = [x for x in n.generators.index if 'HUB' in x]
-    df = n.generators.loc[hub_buses_in_generators]
-    vc = df['bus'].value_counts()
-    bus_AC_and_DC = vc[vc == 2].index  # Identify buses with both AC and DC generators
+    #df = n.generators.loc[hub_buses_in_generators]
+    #vc = df['bus'].value_counts()
+    #bus_AC_and_DC = vc[vc == 2].index  # Identify buses with both AC and DC generators
 
-    for _, row in hub_buses.iterrows():
+    for _, row in hubs_gdf.iterrows():
         bus_name = row["node_id"]  
         cluster_gw = row["cluster_GW"] * 1e3  # Convert GW to MW
+        dist = row["distance_to_shore"]
+        
+        # Define AC/DC share based on distance
+        if dist <= 25:
+            ac_share = 1.0
+        elif dist >= 75:
+            ac_share = 0.0
+        else:
+            ac_share = (75 - dist) / (75 - 25)  # linear interpolation
+
+        dc_share = 1 - ac_share
+        
+        # Find AC and DC generator entries
+        bus_bins = [x for x in n.generators.index if x.startswith(f"{bus_name} ") and ("offwind-dc" in x or "offwind-ac" in x)]
+
+        ac_gen = [g for g in bus_bins if "offwind-ac" in g]
+        dc_gen = [g for g in bus_bins if "offwind-dc" in g]
+
+        # Fallback if only one exists
+        if ac_gen and not dc_gen:
+            ac_cap = cluster_gw
+            dc_cap = 0.0
+        elif dc_gen and not ac_gen:
+            dc_cap = cluster_gw
+            ac_cap = 0.0
+        else:
+            ac_cap = cluster_gw * ac_share
+            dc_cap = cluster_gw * dc_share 
+            
+        # Apply capacities
+        for generator in ac_gen:
+            n.generators.loc[generator, "p_nom_max"] = ac_cap
+            #n.generators.loc[generator, "p_nom"] = ac_cap
+
+        for generator in dc_gen:
+            n.generators.loc[generator, "p_nom_max"] = dc_cap
+            #n.generators.loc[generator, "p_nom"] = dc_cap    
+            
+            
 
         # Split capacity if both AC and DC generators exist for the bus
-        if bus_name in bus_AC_and_DC:
-            cluster_gw /= 2
+        #if bus_name in bus_AC_and_DC:
+            #cluster_gw /= 2
         
             # Loop through bus_bins to update generators for each bin
-        bus_bins = [x for x in n.generators.index if x.startswith(f"{bus_name} ") and ("offwind-dc" in x or "offwind-ac" in x)]
-        for generator in bus_bins:
-            if "offwind-dc" in generator:
-                n.generators.loc[generator, "p_nom_max"] = cluster_gw
-            elif "offwind-ac" in generator:
-                n.generators.loc[generator, "p_nom_max"] = cluster_gw    
+        #bus_bins = [x for x in n.generators.index if x.startswith(f"{bus_name} ") and ("offwind-dc" in x or "offwind-ac" in x)]
+        #for generator in bus_bins:
+            #if "offwind-dc" in generator:
+                #n.generators.loc[generator, "p_nom_max"] = cluster_gw
+            #elif "offwind-ac" in generator:
+                #n.generators.loc[generator, "p_nom_max"] = cluster_gw    
 
         # Update p_nom_max and p_nom for both offwind-dc and offwind-ac generators
         #n.generators.loc[f"{bus_name} offwind-dc", "p_nom_max"] = cluster_gw
