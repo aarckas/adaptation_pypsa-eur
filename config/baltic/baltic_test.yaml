@@ -16,8 +16,8 @@ remote:
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#run
 run:
-  prefix: "v6"
-  name: "baltic4_refined_High_HVDC_Cost"
+  prefix: "Final"
+  name: "Base_Case_A"
   scenarios:
     enable: false
     file: config/scenarios.yaml
@@ -36,7 +36,7 @@ foresight: overnight
 scenario:
   clusters:
   #- 80
-   - 100
+   - 128
   # - 256
   opts:
   #- 'onwind+p0.8'
@@ -44,7 +44,8 @@ scenario:
   #- 'onwind+p0.3'
   #- 'CCL'
   - Co2L0
-  #- Co2L0-solar+c0.25
+  #- Co2L0-onwind+p0.5
+  #- Co2L0-lv2.0
   sector_opts:
   - ''
   planning_horizons:
@@ -877,6 +878,9 @@ costs:
     "CO2 intensity": 0
     "discount rate": 0.07
   overwrites: {}
+    #investment:
+        #"HVDC submarine": 1617.50
+        #"HVDC underground": 1617.50
   marginal_cost:
     solar: 0.01
     onwind: 0.015
@@ -925,7 +929,15 @@ clustering:
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#adjustments
 adjustments:
-  electricity: false
+  electricity:
+    absolute:
+      links:
+        "H2 fuel cell":
+          p_nom_max: 8000
+    #factor:
+      #generators:
+        #onwind:
+          #p_nom_max: 0.6
   sector:
     factor:
       Link:
