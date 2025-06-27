@@ -166,18 +166,30 @@ def set_transmission_limit(n, kind, factor, costs, Nyears=1):
 
         n.links.loc[links_dc_b, "p_nom_min"] = n.links.loc[links_dc_b, "p_nom"]
         n.links.loc[links_dc_b, "p_nom_extendable"] = True
-
-    if factor != "opt":
-        con_type = "expansion_cost" if kind == "c" else "volume_expansion"
-        rhs = float(factor) * ref
-        n.add(
-            "GlobalConstraint",
-            f"l{kind}_limit",
-            type=f"transmission_{con_type}_limit",
-            sense="<=",
-            constant=rhs,
-            carrier_attribute="AC, DC",
+        
+    elif (
+        float(factor) == 1.0
+    ):  # do not consider submarine cables for transmission limit
+        links_dc_b = (
+            (n.links.carrier == "DC") & (n.links.underwater_fraction > 0.1)
+            if not n.links.empty
+            else pd.Series()
         )
+        n.links.loc[links_dc_b, "p_nom_min"] = n.links.loc[links_dc_b, "p_nom"]
+        n.links.loc[links_dc_b, "p_nom_extendable"] = True
+
+
+    # if factor != "opt":
+    #     con_type = "expansion_cost" if kind == "c" else "volume_expansion"
+    #     rhs = float(factor) * ref
+    #     n.add(
+    #         "GlobalConstraint",
+    #         f"l{kind}_limit",
+    #         type=f"transmission_{con_type}_limit",
+    #         sense="<=",
+    #         constant=rhs,
+    #         carrier_attribute="AC, DC",
+    #     )
 
     return n
 
@@ -293,7 +305,7 @@ if __name__ == "__main__":
             "prepare_network",
             configfiles="config/baltic/baltic_test.yaml",
             clusters="100",
-            opts="Co2L0",
+            opts="Co2L0-lv2.0",
         )
     configure_logging(snakemake)  # pylint: disable=E0606
     set_scenario_config(snakemake)
