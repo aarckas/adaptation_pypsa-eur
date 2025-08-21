@@ -17,14 +17,22 @@ remote:
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#run
 run:
   prefix: "Final"
-  name: "Base_Case_A"
+  name: "Base_Case_A_no_natura"
   scenarios:
     enable: false
     file: config/scenarios.yaml
   disable_progressbar: false
   shared_resources:
-    policy: false
-    exclude: []
+    policy: False
+    exclude:
+    #- regions_onshore_base_s
+    #- regions_offshore_base_s
+    #- country_shapes
+    #- availability_matrix_128_offwind-ac
+    #- availability_matrix_128_offwind-dc
+    #- availability_matrix_128_solar
+    #- availability_matrix_128_onwind
+    #- profile_128_offwind-dc
   shared_cutouts: true
   use_shadow_directory: true # Set to false if problems regarding missing directories occur
 
@@ -186,7 +194,7 @@ renewable:
     correction_factor: 0.8855
     corine: [44, 255]
     luisa: false # [0, 5230]
-    natura: true
+    natura: false
     ship_threshold: 400
     max_depth: 60
     max_shore_distance: 30000
@@ -205,7 +213,7 @@ renewable:
     correction_factor: 0.8855
     corine: [44, 255]
     luisa: false # [0, 5230]
-    natura: true
+    natura: false
     ship_threshold: 400
     max_depth: 60
     min_shore_distance: 30000
@@ -878,9 +886,11 @@ costs:
     "CO2 intensity": 0
     "discount rate": 0.07
   overwrites: {}
-    #investment:
-        #"HVDC submarine": 1617.50
-        #"HVDC underground": 1617.50
+    # investment:
+    #     "HVDC submarine": 1617.50
+    #     "HVDC underground": 1617.50
+    #     "offwind-ac-station": 530000
+    #     "offwind-dc-station": 970000
   marginal_cost:
     solar: 0.01
     onwind: 0.015
@@ -934,10 +944,10 @@ adjustments:
       links:
         "H2 fuel cell":
           p_nom_max: 8000
-    #factor:
-      #generators:
-        #onwind:
-          #p_nom_max: 0.6
+    # factor:
+    #   generators:
+    #     solar:
+    #       p_nom_max: 0.6
   sector:
     factor:
       Link:
