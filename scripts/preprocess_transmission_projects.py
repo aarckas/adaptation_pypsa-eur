@@ -124,6 +124,7 @@ def adapt_offshore_topology(n: pypsa.Network, countries: list) -> None:
         condition_baltic_offshore_bus = all([
             bus.country in countries,
             bus.x > 9.55,  # Exclude North Sea buses
+            bus.y > 49, # Exclude Mediterranean buses
             bus.symbol != "Wind farm"  # Exclude wind farm buses
         ])
         if condition_baltic_offshore_bus:
