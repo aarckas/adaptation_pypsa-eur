@@ -65,8 +65,7 @@ def plot_h2_map(n, regions):
     line_lower_threshold = 750
 
     # Drop non-electric buses so they don't clutter the plot
-    n.buses.drop(n.buses.index[n.buses.carrier != "AC"], inplace=True)
-
+    n.buses.drop(n.buses.index[~n.buses.carrier.isin(["AC", "DC"])], inplace=True)
     carriers = ["H2 Electrolysis", "H2 Fuel Cell"]
 
     elec = n.links[n.links.carrier.isin(carriers)].index
@@ -258,9 +257,11 @@ if __name__ == "__main__":
 
         snakemake = mock_snakemake(
             "plot_hydrogen_network",
+            configfiles="config/baltic/baltic_sec.yaml",
             opts="",
-            clusters="37",
-            sector_opts="4380H-T-H-B-I-A-dist1",
+            clusters="20",
+            planning_horizons="2050",
+            sector_opts="",    #"4380H-T-H-B-I-A-dist1",
         )
 
     configure_logging(snakemake)
