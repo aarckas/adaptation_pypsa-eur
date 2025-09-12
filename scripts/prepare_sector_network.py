@@ -477,8 +477,16 @@ def update_wind_solar_costs(
             underground_cost = costs.at[
                 tech + "-connection-underground", "capital_cost"
             ]
-            connection_cost = line_length_factor * (
-                distance * submarine_cost + landfall_length * underground_cost
+            # Set connection_cost = 0 for HUB links (based on name match)
+            is_hub_link = distance.index.str.contains("HUB")
+            
+            # Zero connection cost for HUB links
+            connection_cost = pd.Series(0.0, index=distance.index)
+
+            # Apply real cost only for non-HUB links
+            connection_cost.loc[~is_hub_link] = line_length_factor * (
+                distance.loc[~is_hub_link] * submarine_cost
+                + landfall_length * underground_cost
             )
 
             capital_cost = (
@@ -1779,6 +1787,25 @@ def add_storage_and_grids(
     logger.info("Add hydrogen storage")
 
     nodes = pop_layout.index
+    
+    if options["H2_offshore_network"]:
+        logger.info("Adding hydrogen infrastructure for offshore network.")
+        
+        offshore_nodes = n.buses[n.buses["node_type"].isin(["HUB", "POC"])].index
+        
+        n.add("Bus", offshore_nodes + " H2", location=offshore_nodes, carrier="H2", unit="MWh_LHV")
+        
+        n.add(
+        "Link",
+        offshore_nodes + " H2 Electrolysis",
+        bus1=offshore_nodes + " H2",
+        bus0=offshore_nodes,
+        p_nom_extendable=True,
+        carrier="H2 Electrolysis",
+        efficiency=costs.at["electrolysis", "efficiency"],
+        capital_cost=costs.at["electrolysis", "capital_cost"],
+        lifetime=costs.at["electrolysis", "lifetime"],
+    )
 
     n.add("Carrier", "H2")
 
@@ -5994,8 +6021,9 @@ if __name__ == "__main__":
 
         snakemake = mock_snakemake(
             "prepare_sector_network",
+            configfiles="config/baltic/baltic_sec.yaml",
             opts="",
-            clusters="10",
+            clusters="64",
             sector_opts="",
             planning_horizons="2050",
         )
