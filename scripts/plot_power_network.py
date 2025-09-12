@@ -56,14 +56,14 @@ def plot_map(
     n,
     components=["links", "stores", "storage_units", "generators"],
     bus_size_factor=2e10,
-    transmission=False,
+    transmission=True,
     with_legend=True,
 ):
     tech_colors = snakemake.params.plotting["tech_colors"]
 
     assign_locations(n)
     # Drop non-electric buses so they don't clutter the plot
-    n.buses.drop(n.buses.index[n.buses.carrier != "AC"], inplace=True)
+    n.buses.drop(n.buses.index[~n.buses.carrier.isin(["AC", "DC"])], inplace=True)
 
     costs = pd.DataFrame(index=n.buses.index)
 
@@ -240,9 +240,11 @@ if __name__ == "__main__":
 
         snakemake = mock_snakemake(
             "plot_power_network",
+            configfiles="config/baltic/baltic_sec.yaml",
             opts="",
-            clusters="37",
-            sector_opts="4380H-T-H-B-I-A-dist1",
+            clusters="20",
+            planning_horizons="2050",
+            sector_opts=""  #"4380H-T-H-B-I-A-dist1",
         )
 
     configure_logging(snakemake)
