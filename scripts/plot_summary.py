@@ -490,8 +490,7 @@ if __name__ == "__main__":
     if "snakemake" not in globals():
         from _helpers import mock_snakemake
 
-        snakemake = mock_snakemake("plot_summary")
-
+        snakemake = mock_snakemake("plot_summary", configfiles="config/baltic/baltic_sec.yaml")
     configure_logging(snakemake)
     set_scenario_config(snakemake)
 

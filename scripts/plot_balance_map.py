@@ -28,11 +28,12 @@ if __name__ == "__main__":
 
         snakemake = mock_snakemake(
             "plot_balance_map",
-            clusters="10",
+            configfiles="config/baltic/baltic_sec.yaml",
+            clusters="20",
             opts="",
             sector_opts="",
             planning_horizons="2050",
-            carrier="H2",
+            carrier="biogas",
         )
 
     configure_logging(snakemake)

@@ -300,11 +300,11 @@ if __name__ == "__main__":
 
         snakemake = mock_snakemake(
             "make_summary",
-            clusters="5",
+            clusters="20",
             opts="",
             sector_opts="",
-            planning_horizons="2030",
-            configfiles="config/test/config.overnight.yaml",
+            planning_horizons="2050",
+            configfiles="config/baltic/baltic_sec.yaml",
         )
 
     configure_logging(snakemake)

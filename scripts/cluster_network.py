@@ -471,7 +471,7 @@ if __name__ == "__main__":
     if "snakemake" not in globals():
         from _helpers import mock_snakemake
 
-        snakemake = mock_snakemake("cluster_network", clusters=60, configfiles="config/baltic/baltic_test.yaml")
+        snakemake = mock_snakemake("cluster_network", clusters=64, configfiles="config/baltic/baltic_sec.yaml")
     configure_logging(snakemake)
     set_scenario_config(snakemake)
 

@@ -90,8 +90,9 @@ if __name__ == "__main__":
 
         snakemake = mock_snakemake(
             "plot_heatmap_timeseries",
+            configfiles="config/baltic/baltic_sec.yaml",
             simpl="",
-            clusters="10",
+            clusters="20",
             opts="",
             sector_opts="",
             planning_horizons=2050,

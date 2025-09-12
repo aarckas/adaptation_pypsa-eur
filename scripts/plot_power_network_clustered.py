@@ -19,8 +19,8 @@ if __name__ == "__main__":
 
         snakemake = mock_snakemake(
             "plot_power_network_clustered",
-            clusters=128,
-            configfiles=["../../config/config.test.yaml"],
+            clusters=20,
+            configfiles="config/baltic/baltic_sec.yaml",
         )
     set_scenario_config(snakemake)
 
