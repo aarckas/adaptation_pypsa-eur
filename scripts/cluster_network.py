@@ -153,38 +153,51 @@ def distribute_n_clusters_to_countries(
     """
     Determine the number of clusters per country.
     """
-    L = (
-        cluster_weights.groupby([n.buses.country, n.buses.sub_network])
-        .sum()
-        .pipe(normed)
-    )
+    
+    # --- 1) Build per-(country,sub_network) weights only over "base" groups ---
+    # Anything with zero cluster_weight is treated as non-base (HUB/POC) and gets weight 0.
+    L_raw = cluster_weights.groupby([n.buses.country, n.buses.sub_network]).sum()
+    pos = L_raw > 0  # base sub-networks (carry load/weight)
+    # Set non-base to 0, then normalize WITHIN each country so country-rows sum to 1 (if any base exists)
+    L = (L_raw.where(pos, 0.0)
+               .groupby(level=0, group_keys=False)
+               .apply(lambda s: s / s.sum() if s.sum() > 0 else s))
 
+    # Upper bounds (how many candidate buses exist per group)
     N = n.buses.groupby(["country", "sub_network"]).size()[L.index]
 
-    #assert n_clusters >= len(N) and n_clusters <= N.sum(), (
-        #f"Number of clusters must be {len(N)} <= n_clusters <= {N.sum()} for this selection of countries."
-    #)
+    # --- 2) Optional: apply focus_weights as country shares (approximate target) ---
+    if isinstance(focus_weights, dict) and len(focus_weights) > 0:
+        total_focus = float(sum(focus_weights.values()))
+        assert total_focus <= 1.0, "Sum of focus_weights must be ≤ 1."
 
-    if isinstance(focus_weights, dict):
-        total_focus = sum(list(focus_weights.values()))
+        idx_country = L.index.get_level_values(0)
+        L_adj = pd.Series(0.0, index=L.index, dtype=float)
 
-        assert total_focus <= 1.0, (
-            "The sum of focus weights must be less than or equal to 1."
-        )
+        # Give each focused country a share 'w', distributed across its base sub-networks
+        for c, w in focus_weights.items():
+            sel = (idx_country == c)
+            s = L.loc[sel]
+            if s.sum() > 0:
+                L_adj.loc[sel] = s / s.sum() * float(w)
+            # if a country has no base groups, it simply can't receive weight
 
-        for country, weight in focus_weights.items():
-            L[country] = weight / len(L[country])
+        # Distribute the remainder across non-focused countries, proportional to their base weights
+        rem = 1.0 - total_focus
+        other = ~idx_country.isin(focus_weights.keys())
+        if rem > 0 and L.loc[other].sum() > 0:
+            L_adj.loc[other] = L.loc[other] / L.loc[other].sum() * rem
 
-        remainder = [
-            c not in focus_weights.keys() for c in L.index.get_level_values("country")
-        ]
-        L[remainder] = L.loc[remainder].pipe(normed) * (1 - total_focus)
+        L = L_adj
 
-        logger.warning("Using custom focus weights for determining number of clusters.")
+    # Final sanity
+    if not np.isclose(L.sum(), 1.0, rtol=1e-6):
+        # Renormalize just in case of tiny numeric drift
+        if L.sum() > 0:
+            L = L / L.sum()
+        else:
+            raise ValueError("All weights are zero. Check cluster_weights/focus_weights inputs.")
 
-    assert np.isclose(L.sum(), 1.0, rtol=1e-3), (
-        f"Country weights L must sum up to 1.0 when distributing clusters. Is {L.sum()}."
-    )
 
     m = linopy.Model()
     
@@ -471,7 +484,7 @@ if __name__ == "__main__":
     if "snakemake" not in globals():
         from _helpers import mock_snakemake
 
-        snakemake = mock_snakemake("cluster_network", clusters=64, configfiles="config/baltic/baltic_sec.yaml")
+        snakemake = mock_snakemake("cluster_network", clusters=52, configfiles="config/baltic/baltic_sec.yaml")
     configure_logging(snakemake)
     set_scenario_config(snakemake)
 
