@@ -6290,6 +6290,10 @@ if __name__ == "__main__":
     maxext = snakemake.params["lines"]["max_extension"]
     if maxext is not None:
         limit_individual_line_extension(n, maxext)
+    n.links.loc[
+        ((n.links.bus0.str.contains("HUB")) | (n.links.bus1.str.contains("HUB"))) & (n.links.carrier == "DC"),
+        "p_nom_max"
+    ] = 8000   
 
     if options["electricity_distribution_grid"]:
         insert_electricity_distribution_grid(
@@ -6310,7 +6314,7 @@ if __name__ == "__main__":
 
     if options["imports"]["enable"]:
         add_import_options(n, costs, options, gas_input_nodes)
-
+        
     if options["gas_distribution_grid"]:
         insert_gas_distribution_costs(n, costs, options=options)
 
