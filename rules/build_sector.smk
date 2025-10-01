@@ -1191,7 +1191,7 @@ rule prepare_sector_network:
         adjustments=config_provider("adjustments", "sector"),
         emissions_scope=config_provider("energy", "emissions"),
         biomass=config_provider("biomass"),
-        RDIR=RDIR,
+        RDIR=(lambda wc: RDIR),
         heat_pump_sources=config_provider("sector", "heat_pump_sources"),
         heat_systems=config_provider("sector", "heat_systems"),
         energy_totals_year=config_provider("energy", "energy_totals_year"),
@@ -1311,19 +1311,18 @@ rule prepare_sector_network:
             "direct_heat_source_utilisation_profiles_base_s_{clusters}_{planning_horizons}.nc"
         ),
     output:
-        resources(
-            "networks/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.nc"
-        ),
+        network = RESULTS
+        + "networks_pre/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.nc",
     threads: 1
     resources:
         mem_mb=2000,
     log:
-        logs(
-            "prepare_sector_network_base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.log"
-        ),
+        solver=RESULTS
+        + "logs_pre/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}_solver.log",
     benchmark:
-        benchmarks(
-            "prepare_sector_network/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}"
+        (
+            RESULTS
+            + "benchmarks_pre/solve_sector_network/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}"
         )
     conda:
         "../envs/environment.yaml"
