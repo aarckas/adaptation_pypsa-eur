@@ -16,20 +16,27 @@ remote:
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#run
 run:
-  prefix: "Diploma"
-  name: "Full_Baltic_Europe_6h_method_1"
+  prefix: "Diploma_v5"
+  name:
+  #- "Base_noImp"
+  - "Base_CostSet1"
+  #- "Base_CostSet2"
+  #- "Base_CostSet3"
   scenarios:
-    enable: false
+    enable: true
     file: config/scenarios.yaml
   disable_progressbar: false
   shared_resources:
-    policy: 'base'
+    policy: true
     exclude: []
+    #- networks/base_s_64___2050"
+    #- networks/base_s_64_elec.nc
     #- regions_onshore_base_s
     #- regions_offshore_base_s
     #- country_shapes
-    #- availability_matrix_128_offwind-ac
-    #- availability_matrix_128_offwind-dc
+    #- availability_matrix_64_offwind-ac.nc
+    #- availability_matrix_64_offwind-dc.nc
+    #- availability_matrix_64_offwind-float.nc
     #- availability_matrix_128_solar
     #- availability_matrix_128_onwind
     #- profile_128_offwind-dc
@@ -44,7 +51,7 @@ foresight: overnight
 scenario:
   clusters:
   # - 20
-  - 64
+  - 52
   # - 80
   # - 128
   # - 256
@@ -117,7 +124,7 @@ electricity:
     H2: 168
 
   extendable_carriers:
-    Generator: [solar, onwind, offwind-ac, offwind-dc, OCGT, CCGT]
+    Generator: [solar, onwind, offwind-ac, offwind-dc, offwind-float, OCGT, CCGT]
     StorageUnit: [] # battery, H2
     Store: [battery, H2] # battery, H2
     Link: [] # H2 pipeline
@@ -127,7 +134,10 @@ electricity:
   everywhere_powerplants: []
 
   conventional_carriers: [nuclear, oil, OCGT, CCGT, coal, lignite, geothermal, biomass]
-  renewable_carriers: [solar, onwind, offwind-ac, offwind-dc, hydro]
+  renewable_carriers: [solar, onwind, offwind-ac, offwind-dc, offwind-float, hydro]
+
+  QGIS_offshore_totals: true
+  baltic_sea_greenfield: true
 
   estimate_renewable_capacities:
     enable: true
@@ -198,7 +208,7 @@ renewable:
     correction_factor: 0.8855
     corine: [44, 255]
     luisa: false # [0, 5230]
-    natura: false
+    natura: true
     ship_threshold: 400
     max_depth: 60
     max_shore_distance: 30000
@@ -214,10 +224,10 @@ renewable:
       add_cutout_windspeed: true
     resource_classes: 1
     capacity_per_sqkm: 2
-    correction_factor: 0.8855
+    correction_factor: 0.8 #0.8855
     corine: [44, 255]
     luisa: false # [0, 5230]
-    natura: false
+    natura: true
     ship_threshold: 400
     max_depth: 60
     min_shore_distance: 30000
@@ -357,7 +367,7 @@ load:
   interpolate_limit: 3
   time_shift_for_large_gaps: 1w
   manual_adjustments: true # false
-  scaling_factor: 1.8
+  scaling_factor: 1
   fixed_year: false # false or year (e.g. 2013)
   supplement_synthetic: true
   distribution_key:
@@ -711,7 +721,7 @@ sector:
   use_fuel_cell_waste_heat: 0.25
   use_electrolysis_waste_heat: 0.25
   electricity_transmission_grid: true
-  electricity_distribution_grid: false
+  electricity_distribution_grid: true
   electricity_grid_connection: true
   transmission_efficiency:
     enable:
@@ -778,7 +788,7 @@ sector:
     upstream_emissions_factor: .1 #share of solid biomass CO2 emissions at full combustion
   imports:
     enable: true 
-    limit: .inf
+    limit: 900 #TWh
     limit_sense: <=
     price:
       H2: 74
@@ -894,10 +904,16 @@ costs:
     "discount rate": 0.07
   overwrites: {}
     # investment:
-    #     "HVDC submarine": 1617.50
-    #     "HVDC underground": 1617.50
-    #     "offwind-ac-station": 530000
-    #     "offwind-dc-station": 970000
+    #     "HVDC submarine": 1680
+    #     "HVDC underground": 1680
+    #     "HVDC overhead": 1680
+    #     "offwind-ac-station": 441000
+    #     "offwind-dc-station": 550000
+    # FOM:
+    #     "HVDC submarine": 2
+    #     "HVDC underground": 2
+    #     "HVDC overhead": 2.5
+
   marginal_cost:
     solar: 0.01
     onwind: 0.015
@@ -921,7 +937,12 @@ clustering:
   mode: busmap
   administrative:
     level: 1
-  focus_weights: false
+  focus_weights:
+    DE: 0.14 #0.18
+    SE: 0.10 #0.11
+    PL: 0.08 #0.11
+    FI: 0.08 #0.09
+    DK: 0.06 #0.08
   simplify_network:
     to_substations: false
     remove_stubs: false
@@ -942,7 +963,7 @@ clustering:
       ramp_limit_down: max
   temporal:
     resolution_elec: false #"365seg"
-    resolution_sector: "12h"
+    resolution_sector: "1460seg" #6h / 8h = 1095seg
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#adjustments
 adjustments:
