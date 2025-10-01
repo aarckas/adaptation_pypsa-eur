@@ -1145,13 +1145,128 @@ def attach_stores(
             p_nom_extendable=True,
             marginal_cost=costs.at["battery inverter", "marginal_cost"],
         )
+        
+
+def rescale_offshore_caps_to_qgis_totals(
+    n,
+    qgis_bus_total_mw: pd.Series,
+    carriers=("offwind-ac","offwind-dc","offwind-float"),
+    only_hubs=True,
+    drop_zero_rows=True,
+):
+    """
+    Rescale offshore p_nom_max on existing generators so that each BUS total equals
+    your QGIS total, while preserving the model's AC/DC/FLOAT shares and bin-level
+    distribution.
+
+    Parameters
+    ----------
+    n : pypsa.Network (already has offshore generators from attach_wind_and_solar)
+    qgis_bus_total_mw : pd.Series
+        Index: bus (same names as n.buses.index), values: total offshore cap [MW] per BUS.
+        (If you only have totals for HUBs, pass a series indexed by those HUB bus names.)
+    carriers : tuple
+        Offshore carriers to include.
+    only_hubs : bool
+        If True, restrict to bus names containing "HUB".
+    drop_zero_rows : bool
+        If True, drop generator rows that end up with p_nom_max == 0 to keep model lean.
+    """
+
+    g = n.generators
+    sel = g.carrier.isin(carriers)
+    if only_hubs:
+        sel &= g.bus.str.contains("HUB", na=False)
+    idx = g.index[sel]
+    if idx.empty:
+        print("No offshore generators found for given selection.")
+        return
+
+    # 1) Existing bus-carrier totals (these encode the native AC/DC/FLOAT split)
+    bc_old = g.loc[idx].groupby(["bus","carrier"])["p_nom_max"].sum()
+
+    # 2) Old bus totals and target bus totals (only for buses present in both)
+    b_old = bc_old.groupby(level="bus").sum()
+    buses = b_old.index.intersection(qgis_bus_total_mw.index)
+    if buses.empty:
+        print("No overlapping buses between network and QGIS totals.")
+        return
+
+    # 3) Shares per (bus,carrier) and new (bus,carrier) totals
+    share_bc = (bc_old / b_old).reindex(bc_old.index)  # keep shape
+    # For buses not in QGIS, keep old totals (so they remain unchanged)
+    target_bus_total = b_old.copy()
+    target_bus_total.loc[buses] = qgis_bus_total_mw.loc[buses]
+    bc_new = (share_bc * target_bus_total.reindex(share_bc.index.get_level_values("bus")).values).fillna(0.0)
+
+    # 4) Allocate new (bus,carrier) totals down to generator rows using original row weights
+    #    (preserve the original per-bin split)
+    row_weights = (
+        g.loc[idx]
+         .groupby(["bus","carrier"])["p_nom_max"]
+         .transform(lambda s: s/s.sum() if s.sum() > 0 else 1/len(s))
+    )
+    # Align bc_new with each row’s (bus,carrier)
+    bc_new_row = bc_new.reindex(g.loc[idx].set_index(["bus","carrier"]).index)
+    new_row_vals = (row_weights * bc_new_row.values).fillna(0.0)
+
+    # 5) Write back
+    n.generators.loc[idx, "p_nom_max"] = new_row_vals.values
+
+    # Optional cleanup: ensure existing capacity doesn't exceed potential
+    over = g.loc[idx, "p_nom"] > g.loc[idx, "p_nom_max"]
+    if over.any():
+        # Clip existing p_nom/p_nom_min to the new potential
+        g.loc[idx[over], "p_nom"] = g.loc[idx[over], "p_nom_max"]
+        g.loc[idx[over], "p_nom_min"] = np.minimum(
+            g.loc[idx[over], "p_nom_min"], g.loc[idx[over], "p_nom_max"]
+        )
+
+    if drop_zero_rows:
+        drop = g.loc[idx].index[g.loc[idx, "p_nom_max"] <= 0]
+        if len(drop):
+            n.remove("Generator", drop)
+
+    # Log a quick summary
+    after_bc = n.generators.loc[n.generators.carrier.isin(carriers)].groupby(["bus","carrier"])["p_nom_max"].sum()
+    print("Rescaled buses:", len(buses))
+    print("New totals (sample):")
+    print(after_bc.groupby(level="bus").sum().loc[buses].head())        
+
+
+def greenfield_baltic_sea(
+    n,
+    carriers=("offwind-ac","offwind-dc", "offwind-float")
+):
+    # HUB buses
+    hubs = n.buses.index[n.buses.index.str.contains("HUB", na=False)]
+    if len(hubs) == 0:
+        print("[greenfield_hubs] No HUB buses found.")
+        return pd.Index([])
+
+    # Offshore generators on HUBs
+    g = n.generators.index[
+        n.generators.bus.isin(hubs) & n.generators.carrier.isin(carriers)
+    ]
+    if len(g) == 0:
+        print("[greenfield_hubs] No offshore generators on HUBs.")
+        return g
+
+    # Zero existing nameplate + lower bound; keep potentials (p_nom_max) and make extendable
+    removed = n.generators.loc[g, ["p_nom","p_nom_min"]].sum()
+    n.generators.loc[g, ["p_nom","p_nom_min"]] = 0.0
+    n.generators.loc[g, "p_nom_extendable"] = True
+
+    print(f"[greenfield_hubs] Cleared existing capacity on {len(g)} units "
+          f"({removed.to_dict()}).")
+    return g
 
 
 if __name__ == "__main__":
     if "snakemake" not in globals():
         from _helpers import mock_snakemake
 
-        snakemake = mock_snakemake("add_electricity", clusters=128, configfiles="config/baltic/baltic_test.yaml")
+        snakemake = mock_snakemake("add_electricity", clusters=64, configfiles="config/baltic/baltic_sec.yaml")
     configure_logging(snakemake)  # pylint: disable=E0606
     set_scenario_config(snakemake)
 
@@ -1241,73 +1356,73 @@ if __name__ == "__main__":
         landfall_lengths,
     )
     
-    # Load bus_data.csv
-    bus_data = pd.read_csv(snakemake.input.bus_data) 
+    # # Load bus_data.csv
+    # bus_data = pd.read_csv(snakemake.input.bus_data) 
 
-    # Filter buses with node_type "HUB"
-    hub_buses = bus_data[bus_data["node_fct"] == "HUB"].copy()
+    # # Filter buses with node_type "HUB"
+    # hub_buses = bus_data[bus_data["node_fct"] == "HUB"].copy()
 
-    hubs_gdf = gpd.GeoDataFrame(hub_buses, geometry=gpd.points_from_xy(hub_buses.x_transformed, hub_buses.y_transformed), crs="EPSG:4326")
-    # 2. Load land polygon (e.g., from PyPSA-Eur)
-    land = gpd.read_file(snakemake.input.regions)  # or land.geojson
-    land = land.to_crs("EPSG:3035")  # Project to meters
+    # hubs_gdf = gpd.GeoDataFrame(hub_buses, geometry=gpd.points_from_xy(hub_buses.x_transformed, hub_buses.y_transformed), crs="EPSG:4326")
+    # # 2. Load land polygon (e.g., from PyPSA-Eur)
+    # land = gpd.read_file(snakemake.input.regions)  # or land.geojson
+    # land = land.to_crs("EPSG:3035")  # Project to meters
     
-    hubs_gdf = hubs_gdf.to_crs("EPSG:3035")
+    # hubs_gdf = hubs_gdf.to_crs("EPSG:3035")
     
-    # 3. Merge land into one shape
-    land_union = land.unary_union  # shapely.geometry.MultiPolygon or Polygon
+    # # 3. Merge land into one shape
+    # land_union = land.unary_union  # shapely.geometry.MultiPolygon or Polygon
 
-    # 4. Compute distance from each HUB to the nearest shore (in km)
-    hubs_gdf["distance_to_shore"] = hubs_gdf.geometry.apply(
-        lambda point: land_union.distance(point) / 1000  # result in km
-    )   
+    # # 4. Compute distance from each HUB to the nearest shore (in km)
+    # hubs_gdf["distance_to_shore"] = hubs_gdf.geometry.apply(
+    #     lambda point: land_union.distance(point) / 1000  # result in km
+    # )   
 
-    # Assign cluster_GW values to p_nom_max and p_nom for corresponding generators
-    hub_buses_in_generators = [x for x in n.generators.index if 'HUB' in x]
-    #df = n.generators.loc[hub_buses_in_generators]
-    #vc = df['bus'].value_counts()
-    #bus_AC_and_DC = vc[vc == 2].index  # Identify buses with both AC and DC generators
+    # # Assign cluster_GW values to p_nom_max and p_nom for corresponding generators
+    # hub_buses_in_generators = [x for x in n.generators.index if 'HUB' in x]
+    # #df = n.generators.loc[hub_buses_in_generators]
+    # #vc = df['bus'].value_counts()
+    # #bus_AC_and_DC = vc[vc == 2].index  # Identify buses with both AC and DC generators
 
-    for _, row in hubs_gdf.iterrows():
-        bus_name = row["node_id"]  
-        cluster_gw = row["cluster_GW"] * 1e3  # Convert GW to MW
-        dist = row["distance_to_shore"]
+    # for _, row in hubs_gdf.iterrows():
+    #     bus_name = row["node_id"]  
+    #     cluster_gw = row["cluster_GW"] * 1e3  # Convert GW to MW
+    #     dist = row["distance_to_shore"]
         
-        # Define AC/DC share based on distance
-        if dist <= 10:
-            ac_share = 1.0
-        elif dist >= 70:
-            ac_share = 0.0
-        else:
-            ac_share = (70 - dist) / (70 - 10)  # linear interpolation
+    #     # Define AC/DC share based on distance
+    #     if dist <= 10:
+    #         ac_share = 1.0
+    #     elif dist >= 70:
+    #         ac_share = 0.0
+    #     else:
+    #         ac_share = (70 - dist) / (70 - 10)  # linear interpolation
 
-        dc_share = 1 - ac_share
+    #     dc_share = 1 - ac_share
         
-        # Find AC and DC generator entries
-        bus_bins = [x for x in n.generators.index if x.startswith(f"{bus_name} ") and ("offwind-dc" in x or "offwind-ac" in x)]
+    #     # Find AC and DC generator entries
+    #     bus_bins = [x for x in n.generators.index if x.startswith(f"{bus_name} ") and ("offwind-dc" in x or "offwind-ac" in x)]
 
-        ac_gen = [g for g in bus_bins if "offwind-ac" in g]
-        dc_gen = [g for g in bus_bins if "offwind-dc" in g]
+    #     ac_gen = [g for g in bus_bins if "offwind-ac" in g]
+    #     dc_gen = [g for g in bus_bins if "offwind-dc" in g]
 
-        # Fallback if only one exists
-        if ac_gen and not dc_gen:
-            ac_cap = cluster_gw
-            dc_cap = 0.0
-        elif dc_gen and not ac_gen:
-            dc_cap = cluster_gw
-            ac_cap = 0.0
-        else:
-            ac_cap = cluster_gw * ac_share
-            dc_cap = cluster_gw * dc_share 
+    #     # Fallback if only one exists
+    #     if ac_gen and not dc_gen:
+    #         ac_cap = cluster_gw
+    #         dc_cap = 0.0
+    #     elif dc_gen and not ac_gen:
+    #         dc_cap = cluster_gw
+    #         ac_cap = 0.0
+    #     else:
+    #         ac_cap = cluster_gw * ac_share
+    #         dc_cap = cluster_gw * dc_share 
             
-        # Apply capacities
-        for generator in ac_gen:
-            n.generators.loc[generator, "p_nom_max"] = ac_cap
-            #n.generators.loc[generator, "p_nom"] = ac_cap
+    #     # Apply capacities
+    #     for generator in ac_gen:
+    #         n.generators.loc[generator, "p_nom_max"] = ac_cap
+    #         #n.generators.loc[generator, "p_nom"] = ac_cap
 
-        for generator in dc_gen:
-            n.generators.loc[generator, "p_nom_max"] = dc_cap
-            #n.generators.loc[generator, "p_nom"] = dc_cap    
+    #     for generator in dc_gen:
+    #         n.generators.loc[generator, "p_nom_max"] = dc_cap
+    #         #n.generators.loc[generator, "p_nom"] = dc_cap    
             
             
 
@@ -1361,8 +1476,16 @@ if __name__ == "__main__":
             estimate_renewable_capacities(
                 n, year, tech_map, expansion_limit, params.countries
             )
-
+            
+    if params.electricity["QGIS_offshore_totals"]:
+        bus_data = pd.read_csv(snakemake.input.bus_data)
+        bus_caps = (bus_data.set_index("node_id")["cluster_GW"] * 1e3).rename("total_mw")  # GW to MW
+        rescale_offshore_caps_to_qgis_totals(n, bus_caps, carriers=("offwind-ac","offwind-dc","offwind-float")) # Replace p_nom_max values with QGIS totals (per tech share)
+    
     update_p_nom_max(n)
+    
+    if params.electricity["baltic_sea_greenfield"]:
+        greenfield_baltic_sea(n, carriers=["offwind-ac","offwind-dc","offwind-float"]) # make baltic sea greenfield by removing p_nom and p_nom_min on offshore HUB generators
 
     attach_storageunits(n, costs, extendable_carriers, max_hours)
     attach_stores(n, costs, extendable_carriers)
