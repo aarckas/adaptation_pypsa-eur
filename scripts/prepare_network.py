@@ -303,9 +303,9 @@ if __name__ == "__main__":
 
         snakemake = mock_snakemake(
             "prepare_network",
-            configfiles="config/baltic/baltic_test.yaml",
-            clusters="128",
-            opts="Co2L0",
+            configfiles="config/baltic/baltic_sec.yaml",
+            clusters="64",
+            opts="",
         )
     configure_logging(snakemake)  # pylint: disable=E0606
     set_scenario_config(snakemake)
@@ -364,6 +364,10 @@ if __name__ == "__main__":
         s_nom_max_ext=snakemake.params.lines.get("max_extension", np.inf),
         p_nom_max_ext=snakemake.params.links.get("max_extension", np.inf),
     )
+    n.links.loc[
+        ((n.links.bus0.str.contains("HUB")) | (n.links.bus1.str.contains("HUB"))) & (n.links.carrier == "DC"),
+        "p_nom_max"
+    ] = 8000
 
     if snakemake.params.autarky["enable"]:
         only_crossborder = snakemake.params.autarky["by_country"]
