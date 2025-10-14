@@ -17,13 +17,21 @@ remote:
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#run
 run:
   prefix: "Diploma_v5"
-  name:
-  #- "Base_noImp"
-  - "Base_CostSet1"
-  #- "Base_CostSet2"
-  #- "Base_CostSet3"
+  name: "Baltic_Cable_Cap_50"
+  # - "No_Onshore_Expansion"
+  # - "Base_noImp"
+  # - "Wake_CostSet1"
+  # - "Base_CostSet2"
+  # - "Base_CostSet3"
+  # - "Wake"
+  # - "No_Interconnectors"
+  # - "No_Offshore_H2_Network"
+  # - "No_Offshore_H2_Network_NoImports"
+  # - "No_Offshore_H2_Network_CostSet1"
+  # - "Baltic_Cable_Cap_75"
+  # - "Baltic_Cable_Cap_50"
   scenarios:
-    enable: true
+    enable: false
     file: config/scenarios.yaml
   disable_progressbar: false
   shared_resources:
@@ -205,7 +213,7 @@ renewable:
       add_cutout_windspeed: true
     resource_classes: 1
     capacity_per_sqkm: 2
-    correction_factor: 0.8855
+    correction_factor: 0.85 #0.8855
     corine: [44, 255]
     luisa: false # [0, 5230]
     natura: true
@@ -224,7 +232,7 @@ renewable:
       add_cutout_windspeed: true
     resource_classes: 1
     capacity_per_sqkm: 2
-    correction_factor: 0.8 #0.8855
+    correction_factor: 0.85 #0.8855
     corine: [44, 255]
     luisa: false # [0, 5230]
     natura: true
@@ -244,7 +252,7 @@ renewable:
     resource_classes: 1
     # ScholzPhd Tab 4.3.1: 10MW/km^2
     capacity_per_sqkm: 2
-    correction_factor: 0.8855
+    correction_factor: 0.85 #0.8855
     # proxy for wake losses
     # from 10.1016/j.energy.2018.08.153
     # until done more rigorously in #153
@@ -337,6 +345,12 @@ links:
   max_extension: 30000 #MW
   length_factor: 1.25
   under_construction: 'keep' # 'zero': set capacity to zero, 'remove': remove, 'keep': with full capacity for lines in grid extract
+  no_interconnectors: false
+
+  baltic_max_cable:
+    activate: true
+    baltic_cable_cap: 2164.5
+    baltic_cable_circuit_mw: 2000
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#transmission_projects
 transmission_projects:
@@ -741,7 +755,7 @@ sector:
     electricity distribution grid:
       efficiency_static: 0.97
   H2_network: true
-  H2_offshore_network: True
+  H2_offshore_network: true
   gas_network: false
   H2_retrofit: false
   H2_retrofit_capacity_per_CH4: 0.6
