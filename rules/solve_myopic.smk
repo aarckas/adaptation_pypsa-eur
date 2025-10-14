@@ -15,6 +15,8 @@ rule add_existing_baseyear:
         network=resources(
             "networks/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.nc"
         ),
+        # network=RESULTS
+        # + "networks_pre/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.nc",
         powerplants=resources("powerplants_s_{clusters}.csv"),
         busmap_s=resources("busmap_base_s.csv"),
         busmap=resources("busmap_base_s_{clusters}.csv"),
@@ -85,6 +87,8 @@ rule add_brownfield:
         network=resources(
             "networks/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.nc"
         ),
+        # network= RESULTS
+        # + "networks_pre/base_s_{clusters}_{opts}_{sector_opts}_{planning_horizons}.nc",
         network_p=solved_previous_horizon,  #solved network at previous time step
         costs=resources("costs_{planning_horizons}.csv"),
         cop_profiles=resources("cop_profiles_base_s_{clusters}_{planning_horizons}.nc"),
