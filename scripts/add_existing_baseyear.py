@@ -704,8 +704,8 @@ if __name__ == "__main__":
 
         snakemake = mock_snakemake(
             "add_existing_baseyear",
-            configfiles="config/test/config.myopic.yaml",
-            clusters="5",
+            configfiles="config/baltic/baltic_myopic.yaml",
+            clusters="52",
             opts="",
             sector_opts="",
             planning_horizons=2030,
@@ -721,9 +721,11 @@ if __name__ == "__main__":
     baseyear = snakemake.params.baseyear
 
     n = pypsa.Network(snakemake.input.network)
-
+    
+    pop_layout = pd.read_csv(snakemake.input.clustered_pop_layout, index_col=0)
+    
     # define spatial resolution of carriers
-    spatial = define_spatial(n.buses[n.buses.carrier == "AC"].index, options)
+    spatial = define_spatial(pop_layout.index, options)
     add_build_year_to_new_assets(n, baseyear)
 
     Nyears = n.snapshot_weightings.generators.sum() / 8760.0
