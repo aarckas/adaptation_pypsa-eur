@@ -1139,6 +1139,46 @@ def add_co2_atmosphere_constraint(n, snapshots):
 
             n.model.add_constraints(lhs <= rhs, name=f"GlobalConstraint-{name}")
 
+def cap_baltic_cable_km(n, snapshots, cap_km, circuit_mw=2000.0):
+    """
+    Global cap on NEW 'cable-km' for HUB DC links.
+    NEW km = Σ length_km * (p_nom - p_nom_min) / circuit_mw
+    """
+    m = n.model
+    var = m.variables["Link-p_nom"]              # xarray-like
+    dim = var.dims[0]                             # usually "Link"
+    link_idx = var.coords[dim].to_index()         # ordered like var
+
+    # align n.links to the variable’s order
+    L = n.links.reindex(link_idx)
+
+    # choose the links to cap
+    mask = (
+        L.carrier.eq("DC")
+        & L.index.str.contains("HUB")
+        & ~L.index.str.endswith("-reversed")
+        & L.p_nom_extendable.fillna(False)
+    )
+
+    # weights: km per MW  (cable_km ≈ Σ length_km/2000 * p_nom)
+    length_km = L.length.fillna(0.0)
+    w = np.where(mask.values, length_km.values / float(circuit_mw), 0.0)
+    
+    # existing baseline km from p_nom_min
+    base_km = np.where(
+        mask.values,
+        (L.p_nom_min.fillna(0.0) * length_km / float(circuit_mw)).values,
+        0.0,
+    ).sum()
+
+    # add the constraint
+    rhs = float(cap_km) + float(base_km)
+    n.model.add_constraints((var * w).sum() <= float(rhs), name="baltic_cable_cap")
+    
+    # optional log for sanity
+    planned_km = (L.p_nom.fillna(0.0) * length_km / float(circuit_mw))[mask].sum()
+    print(f"[baltic_cable_cap] baseline_km={base_km:.1f}, rhs_cap_km={rhs:.1f}, "
+          f"current_planned_km={planned_km:.1f}")
 
 def extra_functionality(
     n: pypsa.Network, snapshots: pd.DatetimeIndex, planning_horizons: str | None = None
@@ -1209,6 +1249,13 @@ def extra_functionality(
 
     if config["sector"]["imports"]["enable"]:
         add_import_limit_constraint(n, snapshots)
+        
+    # Added new baltic cable capacity cap (supply chain sensi)
+    cap = config["links"].get("baltic_max_cable", {})
+    if cap.get("activate"):
+        cap_km = float(cap.get("baltic_cable_cap", None))
+        circuit_mw = float(cap.get("baltic_cable_circuit_mw", 2000.0))
+        cap_baltic_cable_km(n, snapshots, cap_km, circuit_mw)    
 
     if n.params.custom_extra_functionality:
         source_path = n.params.custom_extra_functionality
@@ -1368,9 +1415,9 @@ if __name__ == "__main__":
 
         snakemake = mock_snakemake(
             "solve_network",
-            opts="Co2L0-CCL",
-            clusters="80",
-            configfiles="config/baltic/baltic_test.yaml",
+            opts="",
+            clusters="52",
+            configfiles="config/baltic/baltic_sec.yaml",
             sector_opts="",
             planning_horizons="2050",
         )
