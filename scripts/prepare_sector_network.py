@@ -1788,12 +1788,11 @@ def add_storage_and_grids(
 
     nodes = pop_layout.index
     
+    offshore_nodes = n.buses[n.buses["node_type"].isin(["HUB", "POC"])].index
+    n.add("Bus", offshore_nodes + " H2", location=offshore_nodes, carrier="H2", unit="MWh_LHV")
+    
     if options["H2_offshore_network"]:
         logger.info("Adding hydrogen infrastructure for offshore network.")
-        
-        offshore_nodes = n.buses[n.buses["node_type"].isin(["HUB", "POC"])].index
-        
-        n.add("Bus", offshore_nodes + " H2", location=offshore_nodes, carrier="H2", unit="MWh_LHV")
         
         n.add(
         "Link",
@@ -6023,7 +6022,7 @@ if __name__ == "__main__":
             "prepare_sector_network",
             configfiles="config/baltic/baltic_sec.yaml",
             opts="",
-            clusters="64",
+            clusters="52",
             sector_opts="",
             planning_horizons="2050",
         )
@@ -6345,6 +6344,101 @@ if __name__ == "__main__":
         n, snakemake.params["adjustments"], investment_year
     )
 
+    if not options.get("H2_offshore_network", True):
+
+        # 1) Identify offshore electrical nodes (HUB/POC)
+        node_type = n.buses.get("node_type")
+        offshore_nodes = (
+            node_type.index[node_type.isin(["HUB", "POC"])]
+            if node_type is not None else n.buses.index[[]]
+        )
+
+        # 2) Identify offshore H2 buses that actually exist
+        offshore_h2_buses = n.buses.index[
+            n.buses.carrier.eq("H2") & n.buses.location.isin(offshore_nodes)
+        ]
+
+        # 3) Drop H2 pipelines whose BOTH ends are offshore (HUB/POC)
+        if not n.links.empty:
+            b0_base = n.links.bus0.str.replace(r" H2$", "", regex=True)
+            b1_base = n.links.bus1.str.replace(r" H2$", "", regex=True)
+            is_offshore_h2_pipeline = (
+                n.links.carrier.eq("H2 pipeline")
+                & b0_base.isin(offshore_nodes)
+                & b1_base.isin(offshore_nodes)
+            )
+            to_drop_links = n.links.index[is_offshore_h2_pipeline]
+            n.links.drop(to_drop_links, inplace=True, errors="ignore")
+        else:
+            to_drop_links = []
+
+        # 4) Drop offshore H2 buses EXCEPT those that host an H2 Store
+        keep_h2_bus = set(
+            n.stores.loc[n.stores.carrier.eq("H2 Store"), "bus"].unique()
+        ) if not n.stores.empty else set()
+
+        to_drop_buses = [b for b in offshore_h2_buses if b not in keep_h2_bus]
+
+        if to_drop_buses:
+            # drop components referencing those buses
+            # Links
+            if not n.links.empty:
+                cols = [c for c in ["bus0", "bus1", "bus2", "bus3"] if c in n.links.columns]
+                n.links.drop(
+                    n.links.index[n.links[cols].isin(to_drop_buses).any(axis=1)],
+                    inplace=True, errors="ignore"
+                )
+            # One-port components
+            for comp in ("generators", "loads", "stores", "storage_units"):
+                df = getattr(n, comp)
+                if not df.empty and "bus" in df.columns:
+                    df.drop(df.index[df["bus"].isin(to_drop_buses)],
+                            inplace=True, errors="ignore")
+
+            # finally drop the buses
+            n.buses.drop(to_drop_buses, inplace=True, errors="ignore")
+
+        print(f"[No offshore H2 network] dropped {len(to_drop_links)} H2 pipeline links "
+            f"and {len(to_drop_buses)} offshore H2 buses (kept buses with H2 Store).")
+        
+    if snakemake.params.links["no_interconnectors"]:
+        baltic = {"DE","DK","SE","FI","PL","LT","LV","EE"}  # Baltic Sea littoral states
+
+        # Bus helpers
+        bus_country   = n.buses["country"]
+        node_type     = n.buses.get("node_type")
+        is_offshore   = node_type.isin({"HUB","POC"}) if node_type is not None \
+                        else pd.Series(False, index=n.buses.index)
+
+        # Link endpoints
+        b0, b1 = n.links["bus0"], n.links["bus1"]
+        c0, c1 = b0.map(bus_country), b1.map(bus_country)
+        off0, off1 = b0.map(is_offshore), b1.map(is_offshore)
+
+        # Masks
+        is_dc        = n.links.carrier.eq("DC")
+        both_baltic  = c0.isin(baltic) & c1.isin(baltic)
+        both_onshore = ~off0 & ~off1
+        #cross_border = c0.ne(c1)
+
+        # Default: cross-border only
+        greenfield_mask = is_dc & both_baltic & both_onshore
+
+        idx = n.links.index[greenfield_mask]
+
+        if len(idx):
+            prev_cap = n.links.loc[idx, "p_nom"].fillna(0).sum()
+            n.links.loc[idx, "p_nom_min"] = 0.0
+            n.links.loc[idx, "p_nom"] = 0.0
+            n.links.loc[idx, "p_nom_extendable"] = True
+            # keep max if present; otherwise allow investment without an artificial cap
+            n.links.loc[idx, "p_nom_max"] = n.links.loc[idx, "p_nom_max"].where(
+                n.links.loc[idx, "p_nom_max"].notna(), 30000
+            )
+
+        print(f"[No-IC greenfield] Set {len(idx)} DC interconnectors to greenfield "
+              f"(removed existing sum ≈ {prev_cap:.0f} MW).")    
+        
     n.meta = dict(snakemake.config, **dict(wildcards=dict(snakemake.wildcards)))
 
     sanitize_carriers(n, snakemake.config)
