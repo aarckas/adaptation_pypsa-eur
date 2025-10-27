@@ -6012,6 +6012,50 @@ def add_import_options(
             p_nom=p_nom,
             marginal_cost=import_options["H2"],
         )
+        
+def apply_p_nom_max_overrides(n, overrides: dict, verbose=True):
+    """
+    Set absolute p_nom_max totals for extendable generators at (bus, carrier).
+
+    For each (bus, carrier) target:
+      - find all extendable generators with that bus & carrier (covers bins and myopic -YEAR variants)
+      - scale their existing p_nom_max proportionally so the SUM equals the target
+      - if current sum is 0 or NaN/inf, assign the full target to the first match
+    """
+
+    if not overrides:
+        return
+
+    G = n.generators
+
+    for bus, by_carrier in overrides.items():
+        for carrier, target in by_carrier.items():
+            # match extendable candidates at that bus & carrier
+            idx = G.index[
+                (G.bus == bus) &
+                (G.carrier == carrier) &
+                (G.p_nom_extendable.fillna(False))
+            ]
+
+            if len(idx) == 0:
+                if verbose:
+                    print(f"[override] No extendable generators found for ({bus}, {carrier}).")
+                continue
+
+            current = G.loc[idx, "p_nom_max"].replace([np.inf, -np.inf], np.nan).fillna(0.0)
+            total = current.sum()
+
+            if total > 0:
+                scale = float(target) / total
+                n.generators.loc[idx, "p_nom_max"] = current * scale
+                if verbose:
+                    print(f"[override] ({bus}, {carrier}): scaled {len(idx)} units to total {target:.1f} MW.")
+            else:
+                # nothing to scale → put everything to zero, one unit to target
+                n.generators.loc[idx, "p_nom_max"] = 0.0
+                n.generators.loc[idx[0], "p_nom_max"] = float(target)
+                if verbose:
+                    print(f"[override] ({bus}, {carrier}): assigned {target:.1f} MW to {idx[0]} (others 0).")        
 
 
 if __name__ == "__main__":
@@ -6343,6 +6387,9 @@ if __name__ == "__main__":
     maybe_adjust_costs_and_potentials(
         n, snakemake.params["adjustments"], investment_year
     )
+        
+    overrides = snakemake.params.adjustments.get("p_nom_max_overrides", {})
+    apply_p_nom_max_overrides(n, overrides)     
 
     if not options.get("H2_offshore_network", True):
 
