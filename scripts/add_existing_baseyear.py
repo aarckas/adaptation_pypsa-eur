@@ -22,7 +22,7 @@ from _helpers import (
     set_scenario_config,
     update_config_from_wildcards,
 )
-from add_electricity import load_costs, sanitize_carriers
+from add_electricity import load_costs, sanitize_carriers, rescale_offshore_caps_to_qgis_totals, greenfield_baltic_sea
 from build_energy_totals import cartesian
 from definitions.heat_system import HeatSystem
 from prepare_sector_network import cluster_heat_buses, define_spatial
@@ -109,7 +109,8 @@ def add_existing_renewables(
 
         # distribute capacities among generators potential (p_nom_max)
         gen_i = n.generators.query("carrier == @carrier").index
-        carrier_gens = n.generators.loc[gen_i]
+        carrier_gens_all = n.generators.loc[gen_i]
+        carrier_gens = carrier_gens_all[~carrier_gens_all.index.str.contains("HUB")] #No HUB Generators for existing capacities (Baltic Greenfield)
         res_capacities = []
         for country, group in carrier_gens.groupby(
             carrier_gens.bus.map(n.buses.country)
@@ -747,6 +748,14 @@ if __name__ == "__main__":
         capacity_threshold=snakemake.params.existing_capacities["threshold_capacity"],
         lifetime_values=snakemake.params.costs["fill_values"],
     )
+    
+    # if snakemake.params.electricity["baltic_sea_greenfield"]:
+    #     greenfield_baltic_sea(n, carriers=["offwind-ac","offwind-dc","offwind-float"])
+        
+    # if snakemake.params.electricity["QGIS_offshore_totals"]:
+    #     bus_data = pd.read_csv(snakemake.input.bus_data)
+    #     bus_caps = (bus_data.set_index("node_id")["cluster_GW"] * 1e3).rename("total_mw")  # GW to MW
+    #     rescale_offshore_caps_to_qgis_totals(n, bus_caps, carriers=("offwind-ac","offwind-dc","offwind-float")) # Replace p_nom_max values with QGIS totals (per tech share)
 
     if options["heating"]:
         # one could use baseyear here instead (but dangerous if no data)
