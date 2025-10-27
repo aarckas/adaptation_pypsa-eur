@@ -16,11 +16,11 @@ remote:
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#run
 run:
-  prefix: "Diploma_v5"
-  name: "Baltic_Cable_Cap_50"
+  prefix: "Overnight"
+  name: No_Onshore_Expansion
   # - "No_Onshore_Expansion"
   # - "Base_noImp"
-  # - "Wake_CostSet1"
+  # - "Base_CostSet1"
   # - "Base_CostSet2"
   # - "Base_CostSet3"
   # - "Wake"
@@ -30,6 +30,7 @@ run:
   # - "No_Offshore_H2_Network_CostSet1"
   # - "Baltic_Cable_Cap_75"
   # - "Baltic_Cable_Cap_50"
+  # - "Solar_Cost"
   scenarios:
     enable: false
     file: config/scenarios.yaml
@@ -65,6 +66,7 @@ scenario:
   # - 256
   opts:
   - ''
+  #- 'solar+Generator+c1.25'
   #- Co2L0
   #- 'onwind+p0.8'
   #- 'onwind+p0.6'
@@ -191,7 +193,7 @@ renewable:
       smooth: false
       add_cutout_windspeed: true
     resource_classes: 1
-    capacity_per_sqkm: 3
+    capacity_per_sqkm: 3.5
     # correction_factor: 0.93
     corine:
       grid_codes: [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 31, 32]
@@ -212,7 +214,7 @@ renewable:
       smooth: false
       add_cutout_windspeed: true
     resource_classes: 1
-    capacity_per_sqkm: 2
+    capacity_per_sqkm: 3.5
     correction_factor: 0.85 #0.8855
     corine: [44, 255]
     luisa: false # [0, 5230]
@@ -231,7 +233,7 @@ renewable:
       smooth: false
       add_cutout_windspeed: true
     resource_classes: 1
-    capacity_per_sqkm: 2
+    capacity_per_sqkm: 3.5
     correction_factor: 0.85 #0.8855
     corine: [44, 255]
     luisa: false # [0, 5230]
@@ -251,7 +253,7 @@ renewable:
       add_cutout_windspeed: true
     resource_classes: 1
     # ScholzPhd Tab 4.3.1: 10MW/km^2
-    capacity_per_sqkm: 2
+    capacity_per_sqkm: 3.5
     correction_factor: 0.85 #0.8855
     # proxy for wake losses
     # from 10.1016/j.energy.2018.08.153
@@ -348,7 +350,7 @@ links:
   no_interconnectors: false
 
   baltic_max_cable:
-    activate: true
+    activate: false
     baltic_cable_cap: 2164.5
     baltic_cable_circuit_mw: 2000
 
@@ -423,7 +425,7 @@ energy:
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#biomass
 biomass:
-  year: 2030
+  year: 2050
   scenario: ENS_Med
   classes:
     solid biomass:
@@ -904,7 +906,7 @@ industry:
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#costs
 costs:
-  year: 2030
+  year: 2050
   version: v0.10.1
   social_discountrate: 0.02
   fill_values:
@@ -996,6 +998,17 @@ adjustments:
         electricity distribution grid:
           capital_cost: 1.0
     absolute: false
+
+    p_nom_max_overrides:   # values in MW, absolute totals per (bus, carrier)
+      "BE0 0":
+        offwind-ac: 4000
+        offwind-dc: 4000
+      "DE0 3":
+        offwind-ac: 4000 #3300
+        offwind-dc: 4500
+      "DE0 5":
+        offwind-ac: 5600 #1200
+        offwind-dc: 57000
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#solving
 solving:
