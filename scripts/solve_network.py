@@ -505,6 +505,8 @@ def prepare_network(
 
     if foresight == "myopic":
         add_land_use_constraint(n, planning_horizons)
+        # if limit_max_growth is not None and limit_max_growth["enable"]:
+        #     add_max_growth(n, limit_max_growth)
 
     if foresight == "perfect":
         add_land_use_constraint_perfect(n)
@@ -517,6 +519,108 @@ def prepare_network(
             n, limit_dict=limit_dict, planning_horizons=planning_horizons
         )
 
+
+
+def add_myopic_growth_constraints(n: pypsa.Network, opts: dict) -> None:
+    """
+    Limit *new* capacity per carrier in a myopic (single-period) solve.
+
+    For each carrier c in opts["max_growth"]:
+        sum(p_nom_ext[c])  <=  existing[c] + max_growth_per_period[c]
+
+    where:
+      - existing[c] = capacities already present in this horizon
+      - max_growth_per_period[c] = opts["max_growth"][c] [GW/year]
+                                   × max(years) × opts["factor"]
+
+    Units: everything in MW internally.
+    """
+
+    # How many years does this horizon represent?
+    # (same logic as add_max_growth)
+    years_per_period = float(opts.get("years_per_period", 5.0))
+    factor = years_per_period * opts["factor"]  # effective "years * safety factor"
+
+    gens = n.generators
+
+    # 1) Existing capacity per carrier (MW)
+    #    You may want to tweak this depending on how myopic carry-over is encoded.
+    #    Here we use:
+    #      - non-extendable p_nom      (built / historical)
+    #      - plus p_nom_min of extendable assets (minimum existing)
+    
+    existing = (
+        gens.loc[~gens.p_nom_extendable]
+        .groupby("carrier")["p_nom"]
+        .sum()
+        .fillna(0.0)
+    )
+
+    # 2) Variable capacities for extendable generators
+    p_nom_var = n.model["Generator-p_nom"]  # dims: ["Generator-ext"]
+    ext = gens.query("p_nom_extendable").rename_axis(index="Generator-ext")
+
+    # loop over carriers that have max_growth entry
+    for carrier, base_growth_gw_per_year in opts.get("max_growth", {}).items():
+        # skip empty
+        ext_carrier = ext.index[ext.carrier == carrier]
+        if ext_carrier.empty:
+            continue
+
+        # allowed growth in this period [MW]
+        max_growth_mw = base_growth_gw_per_year * factor * 1e3
+
+        # RHS: existing + allowed growth
+        existing_mw = existing.get(carrier, 0.0)
+
+        # constant baseline per generator (MW)
+        p_nom_min = gens.loc[ext_carrier, "p_nom_min"].fillna(0.0)
+
+        # NEW build only: (p_nom - p_nom_min)
+        lhs = (p_nom_var.loc[ext_carrier] - p_nom_min).sum()
+
+        # cap only the new build in this period
+        rhs = max_growth_mw
+
+        logger.info(
+            f"[myopic max growth] carrier={carrier}, "
+            f"existing={existing_mw/1e3:.1f} GW, "
+            f"allowed_growth={max_growth_mw/1e3:.1f} GW, "
+            f"implied_total_if_binding={(existing_mw + max_growth_mw)/1e3:.1f} GW"
+        )
+
+        n.model.add_constraints(
+            lhs <= rhs,
+            name=f"myopic_max_growth_{carrier}",
+        )
+
+    # Optional: relative growth constraint (max_relative_growth)
+    for carrier, rel in opts.get("max_relative_growth", {}).items():
+        ext_carrier = ext.index[ext.carrier == carrier]
+        if ext_carrier.empty:
+            continue
+
+        existing_mw = existing.get(carrier, 0.0)
+        if existing_mw <= 0:
+            # no existing capacity → relative growth meaningless, skip
+            continue
+
+        # max additional capacity due to relative growth
+        max_rel_growth_mw = rel * existing_mw
+        rhs = max_rel_growth_mw
+
+        lhs = p_nom_var.loc[ext_carrier].sum()
+
+        logger.info(
+            f"[myopic rel growth] carrier={carrier}, "
+            f"existing={existing_mw/1e3:.1f} GW, "
+            f"rel_factor={rel}, cap_limit={rhs/1e3:.1f} GW"
+        )
+
+        n.model.add_constraints(
+            lhs <= rhs,
+            name=f"myopic_max_relative_growth_{carrier}",
+        )
 
 def add_CCL_constraints(
     n: pypsa.Network, config: dict, planning_horizons: str | None
@@ -1243,6 +1347,17 @@ def extra_functionality(
         add_retrofit_gas_boiler_constraint(n, snapshots)
     else:
         add_co2_atmosphere_constraint(n, snapshots)
+        
+    
+    # --- NEW: myopic max growth constraints ---
+    # limit_max_growth lives under config["sector"]["limit_max_growth"]
+    limit_cfg = config.get("sector", {}).get("limit_max_growth", None)
+
+    # n._multi_invest is True for perfect-foresight multi-invest runs
+    if (limit_cfg is not None
+        and limit_cfg.get("enable", False)
+        and not n._multi_invest):    # i.e. myopic / single-period
+        add_myopic_growth_constraints(n, limit_cfg)    
 
     if config["sector"]["enhanced_geothermal"]["enable"]:
         add_flexible_egs_constraint(n)
@@ -1414,12 +1529,12 @@ if __name__ == "__main__":
         from _helpers import mock_snakemake
 
         snakemake = mock_snakemake(
-            "solve_network",
+            "solve_sector_network_myopic",
             opts="",
             clusters="52",
-            configfiles="config/baltic/baltic_sec.yaml",
+            configfiles="config/baltic/baltic_myopic.yaml",
             sector_opts="",
-            planning_horizons="2050",
+            planning_horizons= "2040",
         )
     configure_logging(snakemake)
     set_scenario_config(snakemake)
