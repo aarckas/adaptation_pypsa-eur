@@ -28,6 +28,7 @@ from add_electricity import (
     load_costs,
     sanitize_carriers,
     sanitize_locations,
+    set_transmission_costs
 )
 from build_energy_totals import (
     build_co2_totals,
@@ -5455,11 +5456,11 @@ def remove_h2_network(n):
         n.stores.drop("EU H2 Store", inplace=True)
 
 
-def limit_individual_line_extension(n, maxext):
-    logger.info(f"Limiting new HVAC and HVDC extensions to {maxext} MW")
-    n.lines["s_nom_max"] = n.lines["s_nom"] + maxext
-    hvdc = n.links.index[n.links.carrier == "DC"]
-    n.links.loc[hvdc, "p_nom_max"] = n.links.loc[hvdc, "p_nom"] + maxext
+def limit_individual_line_extension(n, maxext_lines, maxext_links):
+    logger.info(f"Limiting new HVAC and HVDC extensions to {maxext_lines} MW")
+    n.lines["s_nom_max"] = n.lines["s_nom"] + maxext_lines
+    hvdc = n.links.index[(n.links.carrier == "DC") & (n.links.get("build_year", pd.Series(np.inf, index=n.links.index)).fillna(np.inf) < 2030)]
+    n.links.loc[hvdc, "p_nom_max"] = n.links.loc[hvdc, "p_nom"] + maxext_links
 
 
 aggregate_dict = {
@@ -6115,6 +6116,8 @@ if __name__ == "__main__":
         if "landfall_length" in settings.keys()
     }
     patch_electricity_network(n, costs, carriers_to_keep, profiles, landfall_lengths)
+    
+    set_transmission_costs(n, costs, snakemake.params.length_factor, snakemake.params.length_factor)
 
     fn = snakemake.input.heating_efficiencies
     year = int(snakemake.params["energy_totals_year"])
@@ -6330,13 +6333,17 @@ if __name__ == "__main__":
         limit,
     )
 
-    maxext = snakemake.params["lines"]["max_extension"]
-    if maxext is not None:
-        limit_individual_line_extension(n, maxext)
+    maxext_lines = snakemake.params["lines"]["max_extension"]
+    maxext_links = snakemake.params["links"]["max_extension"]
+    if maxext_links is not None:
+        limit_individual_line_extension(n, maxext_lines, maxext_links)
+        
     n.links.loc[
         ((n.links.bus0.str.contains("HUB")) | (n.links.bus1.str.contains("HUB"))) & (n.links.carrier == "DC"),
         "p_nom_max"
-    ] = 8000   
+    ] = 2000
+    
+       
 
     if options["electricity_distribution_grid"]:
         insert_electricity_distribution_grid(

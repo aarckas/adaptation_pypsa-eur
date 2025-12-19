@@ -488,10 +488,12 @@ def set_transmission_costs(
     #Adjusted so that DC-links from the base network apply link_length_factor but added links dont.
     # Detect HUB links
     is_hub_link = n.links.loc[dc_b].index.str.contains("HUB")
+    is_ic = n.links.loc[dc_b].build_year >= 2030
 
     # Define link-specific length factors
     length_factors = pd.Series(link_length_factor, index=n.links.loc[dc_b].index)
     length_factors[is_hub_link] = 1.0  # Don't scale for HUB links
+    length_factors[is_ic] = 1.0  # Don't scale for new IC links
 
     costs = (
         n.links.loc[dc_b, "length"]
