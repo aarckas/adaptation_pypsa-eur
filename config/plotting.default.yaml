@@ -45,6 +45,7 @@ plotting:
       electricity:
       - AC
       - low voltage
+      - DC
       heat:
       - urban central heat
       - urban decentral heat
@@ -263,13 +264,18 @@ plotting:
     # wind
     onwind: "#235ebc"
     onshore wind: "#235ebc"
+    Onshore Wind: "#235ebc"
     offwind: "#6895dd"
     offshore wind: "#6895dd"
     offwind-ac: "#6895dd"
     offshore wind (AC): "#6895dd"
+    Offshore Wind (AC): "#6895dd"
+    Offshore Wind (near): "#6895dd"
     offshore wind ac: "#6895dd"
     offwind-dc: "#74c6f2"
     offshore wind (DC): "#74c6f2"
+    Offshore Wind (DC): "#74c6f2"
+    Offshore Wind (far): "#74c6f2"
     offshore wind dc: "#74c6f2"
     offwind-float: "#b5e2fa"
     offshore wind (Float): "#b5e2fa"
@@ -280,10 +286,12 @@ plotting:
     ror: '#3dbfb0'
     run of river: '#3dbfb0'
     hydroelectricity: '#298c81'
+    Hydroelectricity: '#298c81'
     PHS: '#51dbcc'
     hydro+PHS: "#08ad97"
     # solar
     solar: "#f9d002"
+    Solar: "#f9d002"
     solar PV: "#f9d002"
     solar-hsat: "#fdb915"
     solar thermal: '#ffbf2b'
@@ -293,6 +301,8 @@ plotting:
     services urban decentral solar thermal: '#dfb953'
     urban central solar thermal: '#d7b24c'
     solar rooftop: '#ffea80'
+    Solar Rooftop: '#ffea80'
+
     # gas
     OCGT: '#e0986c'
     OCGT marginal: '#e0986c'
@@ -306,6 +316,7 @@ plotting:
     services urban decentral gas boiler: '#ba8947'
     urban central gas boiler: '#b0904f'
     gas: '#e05b09'
+    Gas: '#e05b09'
     fossil gas: '#e05b09'
     natural gas: '#e05b09'
     biogas to gas: '#e36311'
@@ -349,7 +360,9 @@ plotting:
     Lignite marginal: '#826837'
     # biomass
     biogas: '#e3d37d'
+    Biogas: '#e3d37d'
     biomass: '#baa741'
+    Biomass: '#baa741'
     solid biomass: '#baa741'
     municipal solid waste: '#91ba41'
     solid biomass import: '#d5ca8d'
@@ -374,7 +387,10 @@ plotting:
     # power transmission
     lines: '#6c9459'
     transmission lines: '#6c9459'
+    Transmission Lines: '#6c9459'
+    Transmission Infrastructure: '#6c9459'
     electricity distribution grid: '#97ad8c'
+    Electricity Distribution Grid: '#97ad8c'
     low voltage: '#97ad8c'
     # electricity demand
     Electric load: '#110d63'
@@ -386,6 +402,7 @@ plotting:
     # battery + EVs
     battery: '#ace37f'
     battery storage: '#ace37f'
+    Battery Storage: '#ace37f'
     battery charger: '#88a75b'
     battery discharger: '#5d4e29'
     home battery: '#80c944'
@@ -398,6 +415,7 @@ plotting:
     land transport demand: '#38baf2'
     EV battery: '#baf238'
     # hot water storage
+    Hot Water Storage: '#cc826a'
     water tanks: '#e69487'
     residential rural water tanks: '#f7b7a3'
     services rural water tanks: '#f3afa3'
@@ -443,6 +461,8 @@ plotting:
     # heat supply
     heat pumps: '#2fb537'
     heat pump: '#2fb537'
+    Heat Pump: '#2fb537'
+    Heating: '#2fb537'
     air heat pump: '#36eb41'
     residential urban decentral air heat pump: '#48f74f'
     services urban decentral air heat pump: '#5af95d'
@@ -523,6 +543,7 @@ plotting:
     industry methanol: '#468c8b'
     # co2
     CC: '#f29dae'
+    Carbon Capture: '#f29dae'
     CCS: '#f29dae'
     CO2 sequestration: '#f29dae'
     DAC: '#ff5270'
@@ -567,7 +588,10 @@ plotting:
     waste CHP CC: '#e3d3ff'
     HVC to air: 'k'
     import H2: '#db8ccd'
+    Import H2: '#db8ccd'
     import gas: '#f7a572'
     import NH3: '#e2ed74'
     import oil: '#93eda2'
+    Import Oil: '#93eda2'
     import methanol: '#87d0e6'
+    Import Methanol: '#87d0e6'
