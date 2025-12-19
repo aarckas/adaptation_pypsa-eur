@@ -135,7 +135,7 @@ def plot_energy_balance_timeseries(
         handles=handles[:half],
         labels=labels[:half],
         loc="outside right upper",
-        fontsize=6,
+        fontsize=9,
     )
 
     # Save figures
@@ -187,7 +187,7 @@ if __name__ == "__main__":
             "plot_balance_timeseries",
             configfiles="config/baltic/baltic_sec.yaml",
             simpl="",
-            clusters="20",
+            clusters="52",
             opts="",
             sector_opts="",
             planning_horizons=2050,
