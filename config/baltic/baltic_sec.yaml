@@ -16,8 +16,8 @@ remote:
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#run
 run:
-  prefix: "Overnight"
-  name: No_Onshore_Expansion
+  prefix: "Final_v274"
+  name: New
   # - "No_Onshore_Expansion"
   # - "Base_noImp"
   # - "Base_CostSet1"
@@ -248,7 +248,7 @@ renewable:
     cutout: default
     resource:
       method: wind
-      turbine: NREL_ReferenceTurbine_5MW_offshore
+      turbine: NREL_ReferenceTurbine_5MW_offshore #NREL_ReferenceTurbine_2020ATB_5.5MW 
       smooth: false
       add_cutout_windspeed: true
     resource_classes: 1
@@ -344,7 +344,7 @@ lines:
 links:
   p_max_pu: 1.0
   p_nom_max: .inf
-  max_extension: 30000 #MW
+  max_extension: 15000 #MW
   length_factor: 1.25
   under_construction: 'keep' # 'zero': set capacity to zero, 'remove': remove, 'keep': with full capacity for lines in grid extract
   no_interconnectors: false
@@ -997,7 +997,15 @@ adjustments:
       Link:
         electricity distribution grid:
           capital_cost: 1.0
+      generators:
+        solar:
+          capital_cost: 1.25
+        onwind:
+          capital_cost: 1.25
+        solar rooftop:
+          capital_cost: 1.25     
     absolute: false
+
 
     p_nom_max_overrides:   # values in MW, absolute totals per (bus, carrier)
       "BE0 0":

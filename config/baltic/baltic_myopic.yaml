@@ -16,8 +16,8 @@ remote:
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#run
 run:
-  prefix: "Myopic"
-  name: Test_Final_v2
+  prefix: "Final_v274"
+  name: Myopic_Base_limits_v3
   # - "No_Onshore_Expansion"
   # - "Base_noImp"
   # - "Wake_CostSet1"
@@ -76,7 +76,9 @@ scenario:
   planning_horizons:
   # - 2020
   - 2030
+  - 2035
   - 2040
+  - 2045
   - 2050
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#countries
@@ -340,7 +342,7 @@ lines:
 links:
   p_max_pu: 1.0
   p_nom_max: .inf
-  max_extension: 30000 #MW
+  max_extension: 15000 #MW
   length_factor: 1.25
   under_construction: 'keep' # 'zero': set capacity to zero, 'remove': remove, 'keep': with full capacity for lines in grid extract
   no_interconnectors: false
@@ -421,7 +423,7 @@ energy:
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#biomass
 biomass:
-  year: 2030
+  year: 2050
   scenario: ENS_Med
   classes:
     solid biomass:
@@ -473,7 +475,7 @@ solar_thermal:
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#existing-capacities
 existing_capacities:
-  grouping_years_power: [1920, 1950, 1955, 1960, 1965, 1970, 1975, 1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020, 2025, 2030]
+  grouping_years_power: [1920, 1950, 1955, 1960, 1965, 1970, 1975, 1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2020, 2025]
   grouping_years_heat: [1980, 1985, 1990, 1995, 2000, 2005, 2010, 2015, 2019] # heat grouping years >= baseyear will be ignored
   threshold_capacity: 10
   default_heating_lifetime: 20
@@ -773,19 +775,24 @@ sector:
   bioH2: false
   municipal_solid_waste: false
   limit_max_growth:
-    enable: false
+    enable: true
     # allowing 30% larger than max historic growth
     factor: 1.3
+    years_per_period: 5
     max_growth:  # unit GW
-      onwind: 16 # onshore max grow so far 16 GW in Europe https://www.iea.org/reports/renewables-2020/wind
-      solar: 28 # solar max grow so far 28 GW in Europe https://www.iea.org/reports/renewables-2020/solar-pv
-      offwind-ac: 35 # offshore max grow so far 3.5 GW in Europe https://windeurope.org/about-wind/statistics/offshore/european-offshore-wind-industry-key-trends-statistics-2019/
-      offwind-dc: 35
-    max_relative_growth:
-      onwind: 3
-      solar: 3
-      offwind-ac: 3
-      offwind-dc: 3
+      onwind: 22 # onshore max grow so far 16 GW in Europe https://www.iea.org/reports/renewables-2020/wind
+      solar: 34 # solar max grow so far 28 GW in Europe https://www.iea.org/reports/renewables-2020/solar-pv
+      offwind-ac: 9 # offshore max grow so far 3.5 GW in Europe https://windeurope.org/about-wind/statistics/offshore/european-offshore-wind-industry-key-trends-statistics-2019/
+      offwind-dc: 7
+      offwind-float: 5
+      solar rooftop: 35
+    max_relative_growth: {}
+      # onwind: 3
+      # solar: 3
+      # offwind-ac: 3
+      # offwind-dc: 3
+      # offwind-float: 3
+      # solar rooftop: 3
   enhanced_geothermal:
     enable: false
     flexible: true
@@ -902,7 +909,7 @@ industry:
 
 # docs in https://pypsa-eur.readthedocs.io/en/latest/configuration.html#costs
 costs:
-  year: 2030
+  year: 2050
   version: v0.10.1
   social_discountrate: 0.02
   fill_values:
@@ -993,6 +1000,37 @@ adjustments:
       Link:
         electricity distribution grid:
           capital_cost: 1.0
+      # generators:    
+      #   solar:
+      #     p_nom_max:
+      #       2030: 1.0   # full potential
+      #       2040: 0.75   # only 70% of original potential
+      #       2050: 1.0   # full potential again
+      #   onwind:
+      #     p_nom_max:
+      #       2030: 1.0
+      #       2040: 0.75
+      #       2050: 1.0
+      #   offwind-ac:
+      #     p_nom_max:
+      #       2030: 1.0
+      #       2040: 0.75
+      #       2050: 1.0
+      #   offwind-dc:
+      #     p_nom_max:
+      #       2030: 1.0
+      #       2040: 0.75
+      #       2050: 1.0
+      #   offwind-float:
+      #     p_nom_max:
+      #       2030: 1.0
+      #       2040: 0.75
+      #       2050: 1.0 
+      #   solar rooftop:
+      #     p_nom_max:
+      #       2030: 1.0
+      #       2040: 0.75
+      #       2050: 1.0                
     absolute: false
 
     p_nom_max_overrides:   # values in MW, absolute totals per (bus, carrier)
